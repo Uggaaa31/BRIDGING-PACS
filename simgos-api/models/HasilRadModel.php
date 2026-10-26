@@ -81,6 +81,13 @@ class HasilRadModel {
             $data['dokter_id'] = 0;
         }
 
+        // ── Pastikan kolom text yang NOT NULL di database tidak bernilai null ──
+        $data['klinis'] = $data['klinis'] ?? '';
+        $data['kesan']  = $data['kesan']  ?? '';
+        $data['usul']   = $data['usul']   ?? '';
+        $data['hasil']  = $data['hasil']  ?? '';
+        $data['btk']    = $data['btk']    ?? '';
+
         // ── Batasi DIKIRIM_DARI (char 36) hanya 36 karakter ──────────────────
         if (!empty($data['pacs_hook_uid'])) {
             $data['pacs_hook_uid'] = substr($data['pacs_hook_uid'], 0, 36);

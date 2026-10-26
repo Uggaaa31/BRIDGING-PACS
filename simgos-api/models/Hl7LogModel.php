@@ -66,9 +66,9 @@ class Hl7LogModel {
 
         $sql = "INSERT INTO {$this->table}
                     (`{$c['ref_id']}`, `{$c['jenis']}`, `{$c['provider']}`,
-                     `{$c['kode']}`, `{$c['request']}`, `{$c['kirim']}`, `{$c['status']}`)
+                     `{$c['kode']}`, `{$c['request']}`, `{$c['response']}`, `{$c['kirim']}`, `{$c['status']}`)
                 VALUES
-                    (:ref_id, :jenis, :provider, :kode, :request, :kirim, :status)
+                    (:ref_id, :jenis, :provider, :kode, :request, :response, :kirim, :status)
                 ON DUPLICATE KEY UPDATE
                     `{$c['request']}`      = VALUES(`{$c['request']}`),
                     `{$c['kirim']}`        = 0,
@@ -82,6 +82,7 @@ class Hl7LogModel {
             'provider' => substr($provider, 0, 50),
             'kode'     => substr($kode, 0, 10),
             'request'  => $request,
+            'response' => '',
             'kirim'    => self::KIRIM_BELUM,
             'status'   => 1,
         ]);

@@ -54,27 +54,9 @@ return [
 
     // =========================================================================
     // TABEL 3: Hasil Pemeriksaan Radiologi
-    // Database : layanan
-    // DDL      : hasil_rad.sql
-    //
-    // KOLOM ASLI:
-    //   ID             → AUTO_INCREMENT (tidak perlu di-set manual)
-    //   TINDAKAN_MEDIS → char(11) UNIQUE — ID pemeriksaan/accession
-    //   TANGGAL        → datetime
-    //   KLINIS         → text
-    //   KESAN          → text
-    //   USUL           → text
-    //   HASIL          → longtext
-    //   BTK            → text (Bacaan Tambahan/Keterangan)
-    //   KRITIS         → tinyint (0=Kritis, 1=Tidak Kritis)
-    //   DOKTER         → smallint (ID dokter pembaca — bukan nama!)
-    //   OTOMATIS       → tinyint (1 = diisi otomatis via bridging)
-    //   DIKIRIM_DARI   → char(36) ★ Digunakan untuk menyimpan StudyInstanceUID PACS
-    //   OLEH           → smallint (ID user yang melakukan input)
-    //   STATUS         → tinyint (1=Aktif, 0=Batal)
     // =========================================================================
     'hasil_rad' => [
-        'table'       => 'layanan.hasil_rad',
+        'table'       => 'hasil_rad',
         'columns'     => [
             'accession_number'    => 'TINDAKAN_MEDIS',  // char(11) UNIQUE KEY
             'tanggal_pemeriksaan' => 'TANGGAL',
@@ -98,24 +80,9 @@ return [
 
     // =========================================================================
     // TABEL 4: Log Transaksi HL7 PACS
-    // Database : ris
-    // DDL      : hl7_logs.sql
-    //
-    // KOLOM ASLI:
-    //   ID          → AUTO_INCREMENT
-    //   REF_ID      → char(11) — ID referensi (accession/tindakan)
-    //   JENIS       → tinyint (0=ORM, 1=ORU)
-    //   PROVIDER    → varchar(50) — nama PACS/provider
-    //   KODE        → char(10) — kode tindakan
-    //   TGL_REQUEST → datetime (auto = CURRENT_TIMESTAMP)
-    //   REQUEST     → text — raw pesan HL7 yang diterima
-    //   TGL_RESPONSE→ datetime (ON UPDATE CURRENT_TIMESTAMP)
-    //   RESPONSE    → text — ACK yang dikirim balik ke PACS
-    //   KIRIM       → tinyint (0=Belum, 1=Terkirim)
-    //   STATUS      → tinyint (1=Aktif, 0=Batal)
     // =========================================================================
     'hl7_logs' => [
-        'table'       => 'ris.hl7_logs',
+        'table'       => 'hl7_logs',
         'columns'     => [
             'ref_id'       => 'REF_ID',
             'jenis'        => 'JENIS',

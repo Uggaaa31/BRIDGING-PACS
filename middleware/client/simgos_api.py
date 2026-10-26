@@ -151,8 +151,14 @@ def send_to_simgos(payload: SimgosPayload) -> ApiResponse:
             except ValueError:
                 resp_body = {"raw": response.text[:500]}
 
-            # ── Evaluasi HTTP Status ───────────────────────────────────────
-            if response.status_code in (200, 201, 204):
+            # ── Evaluasi HTTP Status & Body ────────────────────────────────
+            is_ok = (
+                response.status_code in (200, 201, 204)
+                and isinstance(resp_body, dict)
+                and resp_body.get("success", False) is True
+            )
+
+            if is_ok:
                 log.info(
                     f"✓ PUT berhasil | status={response.status_code} | "
                     f"duration={duration_ms:.1f}ms | attempt={attempt}"
@@ -164,7 +170,11 @@ def send_to_simgos(payload: SimgosPayload) -> ApiResponse:
                     duration_ms=duration_ms
                 )
             else:
-                last_error = resp_body.get("message", response.text[:200])
+                last_error = (
+                    resp_body.get("message")
+                    if isinstance(resp_body, dict) and "message" in resp_body
+                    else response.text[:200]
+                )
                 log.warning(
                     f"✗ PUT gagal | status={response.status_code} | "
                     f"attempt={attempt}/{SIMGOS_API_MAX_RETRIES} | "

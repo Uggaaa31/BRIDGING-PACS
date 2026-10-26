@@ -103,76 +103,76 @@ if (json_last_error() !== JSON_ERROR_NONE) {
     sendResponse(400, false, 'Format JSON tidak valid: ' . json_last_error_msg());
 }
 
-// ─── 5. Catat ke ris.hl7_logs (audit trail awal, KIRIM=0) ────────────────────
-$hl7LogModel = new Hl7LogModel();
-$refId       = substr($identifier, 0, 11);                             // char(11)
-$kode        = substr($payload['kode_tindakan'] ?? '', 0, 10);        // char(10)
-$provider    = PACS_PROVIDER;
-$jenisLog    = Hl7LogModel::JENIS_ORU;                                 // 1 = ORU
-
-$logId = $hl7LogModel->insert(
-    refId:    $refId,
-    jenis:    $jenisLog,
-    provider: $provider,
-    kode:     $kode,
-    request:  $rawBody   // simpan raw JSON payload sebagai REQUEST
-);
-
-writeLog('info', 'PUT request diterima', [
-    'identifier'  => $identifier,
-    'ip'          => $_SERVER['REMOTE_ADDR'] ?? '?',
-    'bytes'       => strlen($rawBody),
-    'hl7_log_id'  => $logId,
-]);
-
-// ─── 6. Sanitasi & Validasi Field ─────────────────────────────────────────────
-$norm      = sanitizeString($payload['norm'] ?? null, 50);
-$accession = sanitizeString($payload['accession_number'] ?? $identifier, 11); // char(11)
-
-if (empty($accession)) {
-    $errMsg = 'Field accession_number wajib ada.';
-    if ($logId) {
-        $hl7LogModel->updateResponse($logId, json_encode(['error' => $errMsg]), false);
-    }
-    sendResponse(422, false, $errMsg);
-}
-
-// ── Data hasil_rad ──────────────────────────────────────────────────────────
-$cleanHasil = [
-    'accession_number'    => $accession,
-    'tanggal_pemeriksaan' => $payload['tanggal_pemeriksaan'] ?? date('Y-m-d H:i:s'),
-    'klinis'              => sanitizeString($payload['klinis'] ?? null, 65535),
-    'kesan'               => sanitizeString($payload['kesan'] ?? null, 65535),
-    'usul'                => sanitizeString($payload['usul'] ?? null, 65535),
-    'hasil'               => sanitizeString($payload['hasil'] ?? null, 65535),
-    'btk'                 => sanitizeString($payload['btk'] ?? null, 65535),  // Bacaan Tambahan
-    // KRITIS: 0=Kritis, 1=TidakKritis. Default 1 (tidak kritis) dari bridging otomatis
-    'kritis'              => sanitizeInt($payload['kritis'] ?? 1),
-    // DOKTER: harus smallint ID. Jika payload kirim nama (string), set 0
-    'dokter_id'           => sanitizeInt($payload['dokter_id'] ?? 0),
-    // pacs_hook_uid → DIKIRIM_DARI char(36) = StudyInstanceUID
-    'pacs_hook_uid'       => sanitizeString($payload['pacs_hook_uid'] ?? null, 36),
-    // OLEH: ID user bridging (0 = system)
-    'oleh'                => sanitizeInt($payload['oleh'] ?? 0),
-    'status'              => 1,
-];
-
-// ── Data pasien (opsional, jika ada NORM) ────────────────────────────────────
-$cleanPasien = null;
-if ($norm) {
-    $cleanPasien = [
-        'norm'          => $norm,
-        'nama'          => sanitizeString($payload['nama'] ?? null, 255),
-        'tanggal_lahir' => $payload['tanggal_lahir'] ?? null,
-        'jenis_kelamin' => $payload['jenis_kelamin'] ?? '0',
-        'status'        => 1,
-    ];
-}
-
-// ─── 7. Eksekusi Database dalam Transaksi ─────────────────────────────────────
-$pdo = Database::getInstance();
+// ─── 5. Eksekusi Database & Audit Log ───────────────────────────────────────
+$logId = null;
+$hl7LogModel = null;
+$pdo = null;
 
 try {
+    $pdo = Database::getInstance();
+    $hl7LogModel = new Hl7LogModel();
+    $refId       = substr($identifier, 0, 11);                             // char(11)
+    $kode        = substr($payload['kode_tindakan'] ?? '', 0, 10);        // char(10)
+    $provider    = PACS_PROVIDER;
+    $jenisLog    = Hl7LogModel::JENIS_ORU;                                 // 1 = ORU
+
+    $logId = $hl7LogModel->insert(
+        refId:    $refId,
+        jenis:    $jenisLog,
+        provider: $provider,
+        kode:     $kode,
+        request:  $rawBody   // simpan raw JSON payload sebagai REQUEST
+    );
+
+    writeLog('info', 'PUT request diterima', [
+        'identifier'  => $identifier,
+        'ip'          => $_SERVER['REMOTE_ADDR'] ?? '?',
+        'bytes'       => strlen($rawBody),
+        'hl7_log_id'  => $logId,
+    ]);
+
+    // ─── 6. Sanitasi & Validasi Field ─────────────────────────────────────────
+    $norm      = sanitizeString($payload['norm'] ?? null, 50);
+    $accession = sanitizeString($payload['accession_number'] ?? $identifier, 11); // char(11)
+
+    if (empty($accession)) {
+        $errMsg = 'Field accession_number wajib ada.';
+        if ($logId) {
+            $hl7LogModel->updateResponse($logId, json_encode(['error' => $errMsg]), false);
+        }
+        sendResponse(422, false, $errMsg);
+    }
+
+    // ── Data hasil_rad ──────────────────────────────────────────────────────
+    $cleanHasil = [
+        'accession_number'    => $accession,
+        'tanggal_pemeriksaan' => $payload['tanggal_pemeriksaan'] ?? date('Y-m-d H:i:s'),
+        'klinis'              => sanitizeString($payload['klinis'] ?? null, 65535),
+        'kesan'               => sanitizeString($payload['kesan'] ?? null, 65535),
+        'usul'                => sanitizeString($payload['usul'] ?? null, 65535),
+        'hasil'               => sanitizeString($payload['hasil'] ?? null, 65535),
+        'btk'                 => sanitizeString($payload['btk'] ?? null, 65535),  // Bacaan Tambahan
+        'kritis'              => sanitizeInt($payload['kritis'] ?? 1),
+        'dokter_id'           => sanitizeInt($payload['dokter_id'] ?? 0),
+        'pacs_hook_uid'       => sanitizeString($payload['pacs_hook_uid'] ?? null, 36),
+        'oleh'                => sanitizeInt($payload['oleh'] ?? 0),
+        'status'              => 1,
+    ];
+
+    // ── Data pasien (opsional, jika ada NORM) ────────────────────────────────
+    $cleanPasien = null;
+    if ($norm) {
+        $cleanPasien = [
+            'norm'          => $norm,
+            'nama'          => sanitizeString($payload['nama'] ?? null, 255),
+            'tanggal_lahir' => $payload['tanggal_lahir'] ?? null,
+            'jenis_kelamin' => $payload['jenis_kelamin'] ?? '0',
+            'status'        => 1,
+        ];
+    }
+
+    // ─── 7. Eksekusi Database dalam Transaksi ─────────────────────────────────
+    $pdo = Database::getInstance();
     $pdo->beginTransaction();
 
     $results = [
@@ -229,35 +229,35 @@ try {
     ]);
 
 } catch (PDOException $e) {
-    if ($pdo->inTransaction()) $pdo->rollBack();
+    if ($pdo && $pdo->inTransaction()) $pdo->rollBack();
 
-    $errResponse = json_encode(['error' => 'DB Error', 'code' => $e->getCode()]);
-    if ($logId) {
+    $errResponse = json_encode(['error' => 'DB Error', 'message' => $e->getMessage(), 'code' => $e->getCode()]);
+    if ($logId && $hl7LogModel) {
         $hl7LogModel->updateResponse($logId, $errResponse, false);
     }
     writeLog('error', '✗ Database error — ROLLBACK', [
         'error'      => $e->getMessage(),
         'accession'  => $accession ?? '?',
     ]);
-    sendResponse(500, false, 'Database error. Transaksi dibatalkan.', [
+    sendResponse(500, false, 'Database error: ' . $e->getMessage(), [
         'db_error_code' => $e->getCode(),
     ]);
 
 } catch (RuntimeException $e) {
-    if ($pdo->inTransaction()) $pdo->rollBack();
+    if ($pdo && $pdo->inTransaction()) $pdo->rollBack();
 
-    if ($logId) {
+    if ($logId && $hl7LogModel) {
         $hl7LogModel->updateResponse($logId, json_encode(['error' => $e->getMessage()]), false);
     }
     writeLog('error', '✗ Runtime error — ROLLBACK', ['error' => $e->getMessage()]);
     sendResponse(500, false, $e->getMessage());
 
 } catch (Throwable $e) {
-    if ($pdo->inTransaction()) $pdo->rollBack();
+    if ($pdo && $pdo->inTransaction()) $pdo->rollBack();
 
-    if ($logId) {
-        $hl7LogModel->updateResponse($logId, json_encode(['error' => 'Internal error']), false);
+    if ($logId && $hl7LogModel) {
+        $hl7LogModel->updateResponse($logId, json_encode(['error' => $e->getMessage()]), false);
     }
     writeLog('error', '✗ Unexpected error', ['error' => $e->getMessage()]);
-    sendResponse(500, false, 'Internal server error.');
+    sendResponse(500, false, 'Internal server error: ' . $e->getMessage());
 }
