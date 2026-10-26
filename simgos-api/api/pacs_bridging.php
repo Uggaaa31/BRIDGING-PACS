@@ -93,6 +93,48 @@ if (empty($identifier) || $identifier === 'pacs-bridging') {
     sendResponse(400, false, 'Identifier (accession number) wajib ada di URL.');
 }
 
+function parseReportSections(string $text): array {
+    $sections = ['klinis' => '', 'hasil' => '', 'kesan' => '', 'usul' => ''];
+    if (empty($text)) return $sections;
+
+    $patterns = [
+        'klinis' => '/(?:^|\n)\s*(?:KLINIS|INDIKASI|CLINICAL(?:\s+INFORMATION|\s+INDICATION)?)\s*[:：]\s*/i',
+        'hasil'  => '/(?:^|\n)\s*(?:TEMUAN(?:\s+RADIOLOGI|\s+RADIOLOGIS)?|DESKRIPSI|HASIL(?:\s+PEMERIKSAAN)?|FINDINGS)\s*[:：]\s*/i',
+        'kesan'  => '/(?:^|\n)\s*(?:KESIMPULAN(?:\s*\/\s*DIAGNOSIS(?:\s+RADILOGIS|\s+RADIOLOGIS)?)?|KESAN|DIAGNOSIS(?:\s+RADILOGIS|\s+RADIOLOGIS)?|IMPRESSION|CONCLUSION)\s*[:：]\s*/i',
+        'usul'   => '/(?:^|\n)\s*(?:SARAN(?:\s*\/\s*REKOMENDASI)?|REKOMENDASI|USUL|RECOMMENDATION)\s*[:：]\s*/i',
+    ];
+
+    $matches = [];
+    foreach ($patterns as $sec => $regex) {
+        if (preg_match_all($regex, $text, $m, PREG_OFFSET_CAPTURE)) {
+            foreach ($m[0] as $match) {
+                $matches[] = [
+                    'start' => $match[1],
+                    'end'   => $match[1] + strlen($match[0]),
+                    'sec'   => $sec
+                ];
+            }
+        }
+    }
+
+    if (empty($matches)) {
+        $sections['hasil'] = trim($text);
+        return $sections;
+    }
+
+    usort($matches, fn($a, $b) => $a['start'] <=> $b['start']);
+
+    for ($i = 0; $i < count($matches); $i++) {
+        $start = $matches[$i]['end'];
+        $next  = ($i + 1 < count($matches)) ? $matches[$i + 1]['start'] : strlen($text);
+        $sec   = $matches[$i]['sec'];
+        $val   = trim(substr($text, $start, $next - $start));
+        $sections[$sec] = empty($sections[$sec]) ? $val : $sections[$sec] . "\n\n" . $val;
+    }
+
+    return $sections;
+}
+
 // ─── 4. Baca Body JSON ────────────────────────────────────────────────────────
 $rawBody = file_get_contents('php://input');
 if (empty($rawBody)) {
@@ -102,6 +144,42 @@ $payload = json_decode($rawBody, true);
 if (json_last_error() !== JSON_ERROR_NONE) {
     sendResponse(400, false, 'Format JSON tidak valid: ' . json_last_error_msg());
 }
+
+// ─── Auto-Normalize format hierarkis {"Report": {...}} jika dikirimkan ─────────
+if (isset($payload['Report']) || isset($payload['report'])) {
+    $rep = $payload['Report'] ?? $payload['report'];
+    $pat = $rep['patient'] ?? [];
+    $ord = $rep['order'] ?? [];
+    $rpt = $rep['report'] ?? [];
+
+    $descText = $rpt['description'] ?? '';
+    $parsedSections = parseReportSections($descText);
+
+    $payload = [
+        'norm'                => $pat['id'] ?? null,
+        'nama'                => $pat['name'] ?? null,
+        'jenis_kelamin'       => (strtoupper($pat['sex'] ?? '') === 'M') ? '1' : ((strtoupper($pat['sex'] ?? '') === 'F') ? '2' : '0'),
+        'tanggal_lahir'       => !empty($pat['birthDate']) ? date('Y-m-d', strtotime($pat['birthDate'])) : null,
+        'accession_number'    => $ord['id'] ?? $identifier,
+        'kode_tindakan'       => $ord['serviceCode'] ?? null,
+        'nama_tindakan'       => $ord['serviceName'] ?? null,
+        'dokter_pengirim'     => $ord['doctor'] ?? null,
+        'tanggal_pemeriksaan' => $rpt['reportDate'] ?? $ord['orderDate'] ?? date('Y-m-d H:i:s'),
+        'klinis'              => $parsedSections['klinis'] ?? null,
+        'hasil'               => $parsedSections['hasil'] ?? null,
+        'kesan'               => $parsedSections['kesan'] ?? null,
+        'usul'                => $parsedSections['usul'] ?? null,
+        'btk'                 => $rpt['link'] ?? null,
+        'pacs_viewer_url'     => $rpt['link'] ?? null,
+        'dokter_id'           => $rpt['doctorID'] ?? 0,
+        'dokter_nama'         => $rpt['doctorName'] ?? null,
+        'pacs_hook_uid'       => 'RIS_PACS',
+        'kritis'              => 1,
+        'otomatis'            => 1,
+        'oleh'                => 0,
+    ];
+}
+
 
 // ─── 5. Eksekusi Database & Audit Log ───────────────────────────────────────
 $logId = null;

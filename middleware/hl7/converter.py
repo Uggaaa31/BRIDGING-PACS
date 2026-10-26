@@ -77,11 +77,59 @@ class SimgosPayload:
         self.converted_at: str = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
 
     def to_dict(self) -> dict:
-        """Konversi ke dict untuk serialisasi JSON."""
+        """Konversi ke dict flat untuk serialisasi JSON (default SIMGOS API)."""
         return {k: v for k, v in self.__dict__.items() if v is not None}
+
+    def to_report_dict(self) -> dict:
+        """
+        Konversi ke format objek hierarkis 'Report' (Philips PACS / Webhook style).
+        """
+        desc_lines = []
+        if self.hasil:
+            desc_lines.append(f"Temuan Radiologi:\n{self.hasil}")
+        if self.kesan:
+            desc_lines.append(f"Kesimpulan / Diagnosis Radilogis:\n{self.kesan}")
+        if self.usul:
+            desc_lines.append(f"Saran / Rekomendasi:\n{self.usul}")
+        full_desc = "\n\n".join(desc_lines) if desc_lines else (self.hasil or "")
+
+        return {
+            "Report": {
+                "patient": {
+                    "id": self.norm or "",
+                    "name": self.nama or "",
+                    "sex": "M" if self.jenis_kelamin == "1" else ("F" if self.jenis_kelamin == "2" else ""),
+                    "birthDate": (self.tanggal_lahir or "").replace("-", ""),
+                    "phone": "",
+                    "address": "",
+                    "height": "",
+                    "weight": "",
+                    "priority": "",
+                    "department": self.kunjungan_id or "",
+                },
+                "order": {
+                    "id": self.accession_number or "",
+                    "serviceCode": self.kode_tindakan or "",
+                    "serviceName": self.nama_tindakan or "",
+                    "status": "FINALIZED",
+                    "orderDate": self.tanggal_pemeriksaan or "",
+                    "doctor": self.dokter_pengirim or "",
+                    "modality": "US",
+                },
+                "report": {
+                    "description": full_desc,
+                    "description_pdf": "",
+                    "reportDate": self.tanggal_pemeriksaan or "",
+                    "doctorID": str(self.dokter_id) if self.dokter_id else "",
+                    "doctorName": self.dokter_nama or "",
+                    "link": self.pacs_viewer_url or self.btk or "",
+                }
+            }
+        }
 
     def __repr__(self) -> str:
         return f"SimgosPayload(norm={self.norm!r}, accession={self.accession_number!r})"
+
 
 
 # ---------------------------------------------------------------------------
