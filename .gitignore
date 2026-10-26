@@ -1,0 +1,35 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+env/
+venv/
+ENV/
+.venv/
+
+# Logs
+*.log
+middleware/logs/
+simgos-api/logs/
+
+# Environment variables & secrets
+.env
+middleware/.env
+simgos-api/.env
+*.env
+
+# IDE / Editor
+.vscode/
+.idea/
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
+
+# OS generated files
+Thumbs.db
+Desktop.ini
+.DS_Store
