@@ -1,0 +1,10 @@
+MSH|^~\&|PACS_SYSTEM|RSUP_RAD|SIMGOS|RSUP|20241026143025||ORU^R01|MSG-20241026-001|P|2.5|||NE|AL|IDN|UTF-8
+PID|1||00123456^^^RSUP^PI||SUHARTO^BAMBANG^WAHONO||19780315|M|||Jl. Sudirman No. 10^^Jakarta^DKI^10110^IDN|||||||S
+PV1|1|O|RAD^RAD-01^RSUP||||dr. HIDAYAT^MUHAMMAD^^^dr.||||||||||A|123789
+ORC|RE|ORD-2024-001|ACC-2024-001|GRP-001||||||||dr. HIDAYAT^MUHAMMAD
+OBR|1|ORD-2024-001|ACC-2024-001|24630-5^CT Scan Thoraks^LN|||20241026143000|20241026144500|||||INDIKASI: Batuk berkepanjangan, curiga TB paru|||||dr. HIDAYAT^MUHAMMAD||||dr. RADIOLOGI^AGUS
+OBX|1|TX|59776-5^KLINIS^LN||Batuk berkepanjangan > 3 minggu. Riwayat kontak TB. Demam subfebris.||||||F
+OBX|2|TX|59780-7^HASIL^LN||Tampak infiltrat di lobus kanan atas. Terdapat gambaran kavitas diameter +/-2cm. Tidak ada efusi pleura. Jantung dalam batas normal.||||||F
+OBX|3|TX|19005-8^KESAN^LN||TB Paru aktif dengan kavitas di lobus kanan atas. Tidak tampak komplikasi efusi pleura.||||||F
+OBX|4|TX|18783-1^USUL^LN||Saran pemeriksaan sputum BTA dan kultur. Konsultasi paru disarankan.||||||F
+OBX|5|ST|1.2.840.10008.5.1.4.1.1.2^STUDY_UID^DICOM||1.2.840.113619.2.55.3.6070336.17940.1729940400.123||||||F

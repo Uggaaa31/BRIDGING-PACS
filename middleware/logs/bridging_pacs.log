@@ -1,0 +1,6 @@
+2026-10-26 09:35:04 | INFO     | converter | Logger aktif | level=INFO | file=logs\bridging_pacs.log
+2026-10-26 09:35:04 | INFO     | converter | Mulai konversi | MsgType=ORU^R01 | MsgID=MSG-20241026-001
+2026-10-26 09:35:05 | INFO     | converter | Konversi selesai → SimgosPayload(norm='123456', accession='ACC-2024-001')
+2026-10-26 09:46:50 | INFO     | converter | Logger aktif | level=INFO | file=logs\bridging_pacs.log
+2026-10-26 09:46:50 | INFO     | converter | Mulai konversi | MsgType=ORU^R01 | MsgID=MSG-20241026-001
+2026-10-26 09:46:50 | INFO     | converter | Konversi selesai → SimgosPayload(norm='123456', accession='ACC-2024-00')

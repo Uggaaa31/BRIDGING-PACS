@@ -1,0 +1,22 @@
+Options -Indexes
+
+# Aktifkan mod_rewrite
+RewriteEngine On
+
+# Arahkan semua request API ke file router utama
+# URL: /api/v1/radiologi/pacs-bridging/{id}
+RewriteBase /simgos-api/
+
+RewriteCond %{REQUEST_FILENAME} !-f
+RewriteCond %{REQUEST_FILENAME} !-d
+
+# Route: PUT /api/v1/radiologi/pacs-bridging/{identifier}
+RewriteRule ^api/v1/radiologi/pacs-bridging/(.+)$ api/pacs_bridging.php [QSA,L]
+
+# Keamanan: Blokir akses langsung ke config dan model
+RewriteRule ^(config|models)/.*$ - [F,L]
+
+# Header keamanan
+Header always set X-Content-Type-Options "nosniff"
+Header always set X-Frame-Options "DENY"
+Header always set X-XSS-Protection "1; mode=block"
