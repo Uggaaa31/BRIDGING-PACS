@@ -26,10 +26,10 @@ from config.settings import MLLP_HOST, MLLP_PORT
 log = get_logger("main")
 
 BANNER = r"""
-╔══════════════════════════════════════════════════════════╗
-║     PACS → SIMGOS  |  HL7 Bridging Middleware  v1.0     ║
-║     Radiologi Integration Service — RSUP                 ║
-╚══════════════════════════════════════════════════════════╝
++============================================================+
+|     PACS -> SIMGOS  |  HL7 Bridging Middleware  v1.0      |
+|     Radiologi Integration Service - RSUP                  |
++============================================================+
 """
 
 

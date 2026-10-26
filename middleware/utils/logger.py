@@ -9,6 +9,11 @@ import os
 from logging.handlers import RotatingFileHandler
 
 import sys
+if hasattr(sys.stdout, "reconfigure"):
+    sys.stdout.reconfigure(encoding="utf-8", errors="replace")
+if hasattr(sys.stderr, "reconfigure"):
+    sys.stderr.reconfigure(encoding="utf-8", errors="replace")
+
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
 from config.settings import (
     LOG_LEVEL, LOG_DIR, LOG_FILE_NAME,

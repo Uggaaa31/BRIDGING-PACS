@@ -29,6 +29,11 @@ import sys
 import os
 from datetime import datetime
 
+if hasattr(sys.stdout, "reconfigure"):
+    sys.stdout.reconfigure(encoding="utf-8", errors="replace")
+if hasattr(sys.stderr, "reconfigure"):
+    sys.stderr.reconfigure(encoding="utf-8", errors="replace")
+
 # ─── Konstanta MLLP ───────────────────────────────────────────────────────────
 MLLP_START  = b'\x0b'
 MLLP_END    = b'\x1c\x0d'
