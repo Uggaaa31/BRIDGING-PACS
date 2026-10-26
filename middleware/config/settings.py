@@ -7,8 +7,12 @@ Ubah nilai-nilai di sini sesuai lingkungan server Anda.
 import os
 from dotenv import load_dotenv
 
-# Muat variabel dari file .env jika ada (untuk deployment production)
-load_dotenv()
+# Muat variabel dari file .env (prioritas: root project, lalu current directory)
+_root_env = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..', '.env'))
+if os.path.exists(_root_env):
+    load_dotenv(_root_env)
+else:
+    load_dotenv()
 
 # ---------------------------------------------------------------------------
 # MLLP / TCP LISTENER (sisi PACS → Middleware)
