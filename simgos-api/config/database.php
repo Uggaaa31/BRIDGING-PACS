@@ -9,7 +9,8 @@
 // ─── Konfigurasi Database ────────────────────────────────────────────────────
 define('DB_HOST',    getenv('SIMGOS_DB_HOST')    ?: '127.0.0.1');
 define('DB_PORT',    getenv('SIMGOS_DB_PORT')    ?: '3306');
-define('DB_NAME',    getenv('SIMGOS_DB_NAME')    ?: 'simgos2');       // ← Nama database utama
+$envDb = getenv('SIMGOS_DB_NAME');
+define('DB_NAME', $envDb !== false ? trim($envDb) : '');
 define('DB_USER',    getenv('SIMGOS_DB_USER')    ?: 'root');
 define('DB_PASS',    getenv('SIMGOS_DB_PASS')    ?: '');
 define('DB_CHARSET', 'utf8mb4');

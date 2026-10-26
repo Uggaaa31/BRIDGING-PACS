@@ -40,7 +40,7 @@ services:
     environment:
       - SIMGOS_DB_HOST=${SIMGOS_DB_HOST:-host.docker.internal}
       - SIMGOS_DB_PORT=${SIMGOS_DB_PORT:-3306}
-      - SIMGOS_DB_NAME=${SIMGOS_DB_NAME:-simgos2}
+      - SIMGOS_DB_NAME=${SIMGOS_DB_NAME:-}
       - SIMGOS_DB_USER=${SIMGOS_DB_USER:-root}
       - SIMGOS_DB_PASS=${SIMGOS_DB_PASS:-}
       - SIMGOS_API_KEY=${SIMGOS_API_KEY:-PACS-BRIDGE-SECRET-KEY-2024}

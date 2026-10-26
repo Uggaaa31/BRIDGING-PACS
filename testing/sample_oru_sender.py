@@ -49,7 +49,8 @@ def build_sample_hl7(msg_id: str = None, norm: str = "00123456") -> str:
     ts          = now.strftime("%Y%m%d%H%M%S")
     ts_short    = now.strftime("%Y%m%d%H%M")
     msg_ctrl_id = msg_id or f"MSG-{ts}-{os.getpid()}"
-    acc_number  = f"ACC-{now.strftime('%Y%m%d%H%M%S')}"
+    # Format accession number unik 11 karakter (sesuai char(11) TINDAKAN_MEDIS)
+    acc_number  = f"RAD{now.strftime('%H%M%S')}{now.microsecond // 10000:02d}"
 
     # Setiap baris diakhiri dengan \r (Carriage Return) sesuai standar HL7
     segments = [
