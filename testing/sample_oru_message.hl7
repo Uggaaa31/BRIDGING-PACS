@@ -1,10 +1,6 @@
-MSH|^~\&|PACS_SYSTEM|RSUP_RAD|SIMGOS|RSUP|20241026143025||ORU^R01|MSG-20241026-001|P|2.5|||NE|AL|IDN|UTF-8
-PID|1||00123456^^^RSUP^PI||SUHARTO^BAMBANG^WAHONO||19780315|M|||Jl. Sudirman No. 10^^Jakarta^DKI^10110^IDN|||||||S
-PV1|1|O|RAD^RAD-01^RSUP||||dr. HIDAYAT^MUHAMMAD^^^dr.||||||||||A|123789
-ORC|RE|ORD-2024-001|ACC-2024-001|GRP-001||||||||dr. HIDAYAT^MUHAMMAD
-OBR|1|ORD-2024-001|ACC-2024-001|24630-5^CT Scan Thoraks^LN|||20241026143000|20241026144500|||||INDIKASI: Batuk berkepanjangan, curiga TB paru|||||dr. HIDAYAT^MUHAMMAD||||dr. RADIOLOGI^AGUS
-OBX|1|TX|59776-5^KLINIS^LN||Batuk berkepanjangan > 3 minggu. Riwayat kontak TB. Demam subfebris.||||||F
-OBX|2|TX|59780-7^HASIL^LN||Tampak infiltrat di lobus kanan atas. Terdapat gambaran kavitas diameter +/-2cm. Tidak ada efusi pleura. Jantung dalam batas normal.||||||F
-OBX|3|TX|19005-8^KESAN^LN||TB Paru aktif dengan kavitas di lobus kanan atas. Tidak tampak komplikasi efusi pleura.||||||F
-OBX|4|TX|18783-1^USUL^LN||Saran pemeriksaan sputum BTA dan kultur. Konsultasi paru disarankan.||||||F
-OBX|5|ST|1.2.840.10008.5.1.4.1.1.2^STUDY_UID^DICOM||1.2.840.113619.2.55.3.6070336.17940.1729940400.123||||||F
+MSH|^~\&|RIS|FASKES|SIMRS|FASKES|20260126220633||ORU^R01|MSG123456777|P|2.4
+PID|1||test001||TEST PATIENT US||19820214|M|||almat rumah saat ini
+PV1|1|I|Eboni|||||^dr. Pengirim, DPPS, Sp.A
+ORC|RE|123456777|123456777||CM||||20260126202539|||^dr. Pengirim, DPPS, Sp.A
+OBR|1|123456777|123456777|1603^thorax||20260126202539|20260126220633|||||||||^dr. Pengirim, DPPS, Sp.A||||||20260126220633||US|F|||||||1234&Philips Admin
+OBX|1|FT|1603^thorax^L|1|Temuan Radiologi:\.br\Lesi hiperdens berbentuk lentikuler di regio frontal kanan, HU ~73\.br\Volume perkiraan: 1,5 cc\.br\Sulci dan fissura terlihat terdefinisi\.br\No midline shift terlihat\.br\Sistem ventrikel normal\.br\Struktur infratentorial: CPA dan Mesencephalon dalam batas normal\.br\Tulang kranium intact, sinus paranasal dan orbita normal\.br\Diferensiasi grey-white matter tetap jelas\.br\Kesimpulan / Diagnosis Radilogis:\.br\Epidural Hematoma (EDH) regio frontal kanan, volume ~1,5 cc\.br\Tidak ditemukan pergeseran garis tengah atau edema signifikan\.br\Tidak ada fraktur tulang kranial\.br\Saran / Rekomendasi:\.br\Monitoring dan observasi klinis, jika diperlukan intervensi bedah dijalankan sesuai standar klinik\.br\Disarankan follow-up imaging jika gejala neurologis berkemban||https://192.168.150.42/portal/?user_name=simrs\T\password_encrypted=true\T\password=JJFBLBFKHNBBBOAAABKMBLIAMCKLGMOGDFFHKLGMAJICPADN\T\accession_number=123456777|JVBERi0xLjQNJeGCgA=|||F|||20260126220633||1234^Philips Admin

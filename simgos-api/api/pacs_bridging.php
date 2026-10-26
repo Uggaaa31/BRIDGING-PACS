@@ -151,7 +151,7 @@ try {
         'kesan'               => sanitizeString($payload['kesan'] ?? null, 65535),
         'usul'                => sanitizeString($payload['usul'] ?? null, 65535),
         'hasil'               => sanitizeString($payload['hasil'] ?? null, 65535),
-        'btk'                 => sanitizeString($payload['btk'] ?? null, 65535),  // Bacaan Tambahan
+        'btk'                 => sanitizeString($payload['btk'] ?? $payload['pacs_viewer_url'] ?? null, 65535),  // Bacaan Tambahan / URL PACS Viewer
         'kritis'              => sanitizeInt($payload['kritis'] ?? 1),
         'dokter_id'           => sanitizeInt($payload['dokter_id'] ?? 0),
         'pacs_hook_uid'       => sanitizeString($payload['pacs_hook_uid'] ?? null, 36),

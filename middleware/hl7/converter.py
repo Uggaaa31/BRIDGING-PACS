@@ -68,6 +68,8 @@ class SimgosPayload:
         self.oleh: int                        = 0      # OLEH smallint — ID user (0=system)
         # pacs_hook_uid → kolom DIKIRIM_DARI char(36) = StudyInstanceUID PACS
         self.pacs_hook_uid: Optional[str]     = None   # max 36 char (CHAR(36))
+        self.pacs_viewer_url: Optional[str]   = None   # URL viewer PACS web portal
+
 
         # === Metadata ===
         self.message_control_id: Optional[str] = None
@@ -271,67 +273,191 @@ def convert_date_only_hl7(raw: str) -> Optional[str]:
         return None
 
 
-def extract_obx_fields(obx_list: list[HL7Segment]) -> dict[str, str]:
+def unescape_hl7_text(text: str) -> str:
+    """
+    Unescape karakter escape standar HL7 v2.
+    \\.br\\ -> newline
+    \\.sp\\ -> spasi
+    \\T\\   -> & (subcomponent separator)
+    \\S\\   -> ^ (component separator)
+    \\F\\   -> | (field separator)
+    \\R\\   -> ~ (repetition separator)
+    \\E\\   -> \\ (escape character)
+    """
+    if not text:
+        return ""
+    t = text.replace("\\.br\\", "\n").replace("\\.sp\\", " ").replace("\\n", "\n")
+    t = t.replace("\\T\\", "&").replace("\\S\\", "^").replace("\\F\\", "|").replace("\\R\\", "~").replace("\\E\\", "\\")
+    return t.strip()
+
+
+def extract_doctor_info(raw_val: Any) -> tuple[int, Optional[str]]:
+    """
+    Mengekstrak dokter ID (integer) dan nama dokter (string) dari field HL7
+    (misal OBR-32, OBX-16, atau OBR-16).
+    Mendukung format:
+      - '1234&Philips Admin'
+      - '1234^Philips Admin'
+      - '^dr. Pengirim, DPPS, Sp.A'
+      - 'dr. RADIOLOGI^AGUS'
+      - '1234'
+    """
+    if not raw_val:
+        return 0, None
+    raw = str(raw_val).strip()
+    if not raw:
+        return 0, None
+
+    # Normalisasi komponen ^ dan subkomponen &
+    parts = [p.strip() for p in raw.split('^') if p.strip()]
+    if not parts:
+        return 0, None
+
+    if len(parts) == 1 and '&' in parts[0]:
+        parts = [p.strip() for p in parts[0].split('&') if p.strip()]
+
+    doc_id = 0
+    doc_name = None
+
+    if len(parts) >= 2:
+        if parts[0].isdigit():
+            doc_id = int(parts[0])
+            doc_name = ' '.join(parts[1:])
+        elif parts[-1].isdigit():
+            doc_id = int(parts[-1])
+            doc_name = ' '.join(parts[:-1])
+        else:
+            doc_name = ' '.join(parts)
+    elif len(parts) == 1:
+        if parts[0].isdigit():
+            doc_id = int(parts[0])
+        else:
+            doc_name = parts[0]
+
+    return doc_id, doc_name
+
+
+def split_narrative_sections(text: str) -> dict[str, str]:
+    """
+    Mendeteksi dan memisahkan bagian-bagian laporan radiologi jika
+    digabungkan dalam satu teks Formatted Text (FT) (misalnya format Philips PACS).
+
+    Mendukung:
+      - klinis (Klinis / Indikasi)
+      - hasil  (Temuan / Deskripsi / Hasil / Findings)
+      - kesan  (Kesimpulan / Diagnosis / Kesan / Impression)
+      - usul   (Saran / Rekomendasi / Usul / Recommendation)
+    """
+    if not text:
+        return {}
+
+    patterns = [
+        ('klinis', re.compile(r'(?:^|\n)\s*(?:KLINIS|INDIKASI|CLINICAL(?:\s+INFORMATION|\s+INDICATION)?)\s*[:：]\s*', re.I)),
+        ('hasil',  re.compile(r'(?:^|\n)\s*(?:TEMUAN(?:\s+RADIOLOGI|\s+RADIOLOGIS)?|DESKRIPSI|HASIL(?:\s+PEMERIKSAAN)?|FINDINGS)\s*[:：]\s*', re.I)),
+        ('kesan',  re.compile(r'(?:^|\n)\s*(?:KESIMPULAN(?:\s*/\s*DIAGNOSIS(?:\s+RADILOGIS|\s+RADIOLOGIS)?)?|KESAN|DIAGNOSIS(?:\s+RADILOGIS|\s+RADIOLOGIS)?|IMPRESSION|CONCLUSION)\s*[:：]\s*', re.I)),
+        ('usul',   re.compile(r'(?:^|\n)\s*(?:SARAN(?:\s*/\s*REKOMENDASI)?|REKOMENDASI|USUL|RECOMMENDATION)\s*[:：]\s*', re.I)),
+    ]
+
+    matches = []
+    for sec_name, pat in patterns:
+        for m in pat.finditer(text):
+            matches.append((m.start(), m.end(), sec_name))
+
+    if not matches:
+        return {}
+
+    matches.sort(key=lambda x: x[0])
+    sections: dict[str, str] = {}
+    for i, (start, end, sec_name) in enumerate(matches):
+        next_start = matches[i + 1][0] if i + 1 < len(matches) else len(text)
+        content = text[end:next_start].strip()
+        sections[sec_name] = content
+
+    return sections
+
+
+def extract_obx_fields(obx_list: list[HL7Segment]) -> dict[str, Any]:
     """
     Mengekstrak data dari semua segmen OBX.
 
-    Strategi identifikasi berdasarkan OBX-3 (Observation Identifier):
-      - Kode yang mengandung 'CLIN'  / 'INDIKASI'  → klinis
-      - Kode yang mengandung 'HASIL' / 'DESC'       → hasil/bacaan
-      - Kode yang mengandung 'KESAN' / 'IMP'        → kesan/kesimpulan
-      - Kode yang mengandung 'USUL'  / 'REC'        → usul/rekomendasi
-      - Kode yang mengandung 'UID'   / 'STUDY' / 'URL' / 'IMAGE' → pacs hook
-      - Kode yang mengandung 'MOD'                  → modality
-
-    Fallback: OBX-1 (Set ID, urutan) untuk menentukan posisi.
+    Mendukung:
+      1. Single OBX formatted text (FT) dengan sub-judul (Temuan, Kesimpulan, Saran).
+      2. Multiple OBX berurutan/berdasarkan kode identifier (TX, ST, CE).
+      3. URL PACS Web Viewer dari OBX-7 atau OBX-5.
+      4. Dokter observer dari OBX-16.
     """
     result = {
-        "klinis":       "",
-        "hasil":        "",
-        "kesan":        "",
-        "usul":         "",
+        "klinis":        "",
+        "hasil":         "",
+        "kesan":         "",
+        "usul":          "",
+        "btk":           "",
         "pacs_hook_uid": "",
         "pacs_modality": "",
+        "viewer_url":    "",
+        "dokter_id":     0,
+        "dokter_nama":   None,
     }
 
-    def _get_obx_value(seg: HL7Segment) -> str:
-        """Gabungkan semua repetisi OBX-5 menjadi satu string."""
-        raw = seg.field(5).value
-        # Ganti karakter escape HL7 \.br\ dengan newline
-        raw = raw.replace("\\n", "\n").replace("\\.br\\", "\n")
-        return raw.strip()
-
     for i, obx in enumerate(obx_list):
-        obs_id_raw = obx.field(3).value.upper()         # OBX-3: identififer
-        value_type = obx.field(2).value.upper()         # OBX-2: value type (TX, ST, CE)
-        obs_value  = _get_obx_value(obx)
+        obs_id_raw = obx.field(3).value.upper()
+        value_type = obx.field(2).value.upper()
+        obs_value  = unescape_hl7_text(obx.field(5).value)
 
-        # === Match berdasarkan keyword di OBX-3 ===
+        # Cek apakah ada viewer URL di OBX-7, OBX-5, dll
+        for f_idx in [7, 5, 8]:
+            cand = unescape_hl7_text(obx.field(f_idx).value)
+            if cand.startswith("http://") or cand.startswith("https://"):
+                result["viewer_url"] = cand
+                break
+
+        # Cek dokter observer di OBX-16
+        obx16_val = obx.field(16).value
+        if obx16_val:
+            d_id, d_name = extract_doctor_info(obx16_val)
+            if d_id and not result["dokter_id"]:
+                result["dokter_id"] = d_id
+            if d_name and not result["dokter_nama"]:
+                result["dokter_nama"] = d_name
+
+        # 1. Coba parse section jika OBX-5 memiliki format terstruktur (misal Philips PACS)
+        sections = split_narrative_sections(obs_value)
+        if sections:
+            for sec_k, sec_v in sections.items():
+                if sec_v:
+                    result[sec_k] = (result[sec_k] + "\n\n" + sec_v).strip() if result[sec_k] else sec_v
+            continue
+
+        # 2. Match berdasarkan keyword di OBX-3
         if any(k in obs_id_raw for k in ["CLIN", "INDIKASI", "KLINIS"]):
-            result["klinis"] += obs_value + " "
+            result["klinis"] = (result["klinis"] + " " + obs_value).strip()
         elif any(k in obs_id_raw for k in ["STUDY", "UID", "IMAGE", "URL", "HOOK", "DICOM"]):
             result["pacs_hook_uid"] = obs_value
         elif any(k in obs_id_raw for k in ["KESAN", "IMP", "CONCL", "KESIMPULAN"]):
-            result["kesan"] += obs_value + " "
+            result["kesan"] = (result["kesan"] + " " + obs_value).strip()
         elif any(k in obs_id_raw for k in ["USUL", "REC", "SARAN", "RECOM"]):
-            result["usul"] += obs_value + " "
+            result["usul"] = (result["usul"] + " " + obs_value).strip()
         elif any(k in obs_id_raw for k in ["HASIL", "DESC", "DESKRIPSI", "RESULT", "FIND"]):
-            result["hasil"] += obs_value + " "
+            result["hasil"] = (result["hasil"] + " " + obs_value).strip()
         elif any(k in obs_id_raw for k in ["MOD", "MODALITY"]):
             result["pacs_modality"] = obs_value
         else:
-            # Fallback berbasis urutan index OBX (jika tidak ada kode identifier jelas)
-            if i == 0 and not result["klinis"]:
-                result["klinis"] = obs_value
-            elif i == 1 and not result["hasil"]:
-                result["hasil"] = obs_value
-            elif i == 2 and not result["kesan"]:
-                result["kesan"] = obs_value
-            elif i == 3 and not result["usul"]:
-                result["usul"] = obs_value
+            # Fallback: jika hanya ada 1 OBX dan belum terisi, simpan ke hasil
+            if len(obx_list) == 1:
+                if not result["hasil"]:
+                    result["hasil"] = obs_value
+            else:
+                # Fallback multi-OBX berdasarkan urutan index
+                if i == 0 and not result["klinis"]:
+                    result["klinis"] = obs_value
+                elif i == 1 and not result["hasil"]:
+                    result["hasil"] = obs_value
+                elif i == 2 and not result["kesan"]:
+                    result["kesan"] = obs_value
+                elif i == 3 and not result["usul"]:
+                    result["usul"] = obs_value
 
-    # Bersihkan trailing spaces
-    return {k: v.strip() for k, v in result.items()}
+    return {k: (v.strip() if isinstance(v, str) else v) for k, v in result.items()}
 
 
 # ---------------------------------------------------------------------------
@@ -407,17 +533,20 @@ def convert_hl7_to_simgos(msg: HL7Message) -> SimgosPayload:
             except ValueError:
                 pass
 
-        # OBR-16: Ordering Provider (dokter pengirim — nama string, untuk referensi)
-        payload.dokter_pengirim = obr.field(16)[1]  # Given name
+        # OBR-16: Ordering Provider (dokter pengirim)
+        _, pengirim_name = extract_doctor_info(obr.field(16).value)
+        payload.dokter_pengirim = pengirim_name or obr.field(16)[1] or obr.field(16)[0] or None
 
-        # OBR-32: Principal Result Interpreter (dokter pembaca — nama string)
-        # Disimpan di dokter_nama (referensi). Kolom DOKTER di DB adalah integer ID.
-        raw_pembaca = obr.field(32)[0] or obr.field(32)[1]
-        payload.dokter_nama = raw_pembaca or None
+        # OBR-32: Principal Result Interpreter (dokter pembaca)
+        pembaca_id, pembaca_name = extract_doctor_info(obr.field(32).value)
+        if pembaca_id and not payload.dokter_id:
+            payload.dokter_id = pembaca_id
+        if pembaca_name and not payload.dokter_nama:
+            payload.dokter_nama = pembaca_name
 
         log.debug(f"OBR | Accession={payload.accession_number} | "
                   f"Tindakan={payload.kode_tindakan}/{payload.nama_tindakan} | "
-                  f"TglPeriksa={payload.tanggal_pemeriksaan} | DokterNama={payload.dokter_nama}")
+                  f"TglPeriksa={payload.tanggal_pemeriksaan} | DokterID={payload.dokter_id} | DokterNama={payload.dokter_nama}")
     else:
         log.warning("Segmen OBR tidak ditemukan.")
 
@@ -446,12 +575,31 @@ def convert_hl7_to_simgos(msg: HL7Message) -> SimgosPayload:
         payload.kesan         = obx_data["kesan"] or None
         payload.usul          = obx_data["usul"] or None
         payload.btk           = obx_data.get("btk") or None   # Bacaan Tambahan/Keterangan
+
+        # Dokter dari OBX-16 (jika ada dan lebih spesifik)
+        if obx_data.get("dokter_id") and not payload.dokter_id:
+            payload.dokter_id = obx_data["dokter_id"]
+        if obx_data.get("dokter_nama") and not payload.dokter_nama:
+            payload.dokter_nama = obx_data["dokter_nama"]
+
+        # URL Viewer PACS
+        if obx_data.get("viewer_url"):
+            payload.pacs_viewer_url = obx_data["viewer_url"]
+            if not payload.btk:
+                payload.btk = obx_data["viewer_url"]
+
         # pacs_hook_uid → disimpan ke DIKIRIM_DARI char(36) di hasil_rad
         uid_raw = obx_data["pacs_hook_uid"] or None
-        payload.pacs_hook_uid = uid_raw[:36] if uid_raw else None  # Batasi 36 char
-        log.debug(f"OBX | StudyUID={payload.pacs_hook_uid} | Klinis={str(payload.klinis)[:50]}")
+        if not uid_raw and payload.pacs_viewer_url:
+            msh_app = msg.MSH.field(3).value if msg.MSH else "PACS"
+            payload.pacs_hook_uid = f"{msh_app}_PACS"[:36]
+        else:
+            payload.pacs_hook_uid = uid_raw[:36] if uid_raw else None
+
+        log.debug(f"OBX | StudyUID={payload.pacs_hook_uid} | ViewerURL={payload.pacs_viewer_url} | HasilLen={len(payload.hasil or '')}")
     else:
         log.warning("Tidak ada segmen OBX dalam pesan HL7.")
 
     log.info(f"Konversi selesai → {payload}")
     return payload
+
