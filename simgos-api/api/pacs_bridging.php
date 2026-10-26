@@ -31,7 +31,7 @@ require_once __DIR__ . '/../models/Hl7LogModel.php';
 // ─── Konfigurasi ─────────────────────────────────────────────────────────────
 define('API_KEY_VALID',  getenv('SIMGOS_API_KEY') ?: 'PACS-BRIDGE-SECRET-KEY-2024');
 define('PACS_PROVIDER',  getenv('PACS_PROVIDER_NAME') ?: 'PACS');
-define('API_LOG_FILE',   __DIR__ . '/../../logs/simgos_api.log');
+define('API_LOG_FILE',   __DIR__ . '/../logs/simgos_api.log');
 
 // ─── Helper Functions ─────────────────────────────────────────────────────────
 
