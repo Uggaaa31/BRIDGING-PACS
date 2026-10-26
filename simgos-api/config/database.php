@@ -23,9 +23,10 @@ class Database {
      */
     public static function getInstance(): PDO {
         if (self::$instance === null) {
+            $dbPart = DB_NAME !== '' ? sprintf('dbname=%s;', DB_NAME) : '';
             $dsn = sprintf(
-                'mysql:host=%s;port=%s;dbname=%s;charset=%s',
-                DB_HOST, DB_PORT, DB_NAME, DB_CHARSET
+                'mysql:host=%s;port=%s;%scharset=%s',
+                DB_HOST, DB_PORT, $dbPart, DB_CHARSET
             );
 
             $options = [

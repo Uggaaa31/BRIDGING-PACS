@@ -15,14 +15,17 @@
  *   - ris.hl7_logs digunakan untuk audit trail setiap pesan HL7.
  */
 
+$dbName = getenv('SIMGOS_DB_NAME') ?: '';
+$tableHasilRad = ($dbName !== '') ? "hasil_rad" : "`layanan`.`hasil_rad`";
+$tableHl7Logs  = ($dbName !== '') ? "hl7_logs"  : "`ris`.`hl7_logs`";
+
 return [
 
     // =========================================================================
     // TABEL 1: Data Master Pasien
-    // (Sesuaikan jika Anda memiliki DDL master.pasien)
     // =========================================================================
     'pasien' => [
-        'table'       => 'master.pasien',
+        'table'       => ($dbName !== '') ? "pasien" : "`master`.`pasien`",
         'columns'     => [
             'norm'          => 'NORM',
             'nama'          => 'NAMA',
@@ -35,10 +38,9 @@ return [
 
     // =========================================================================
     // TABEL 2: Order / Tindakan Medis Radiologi
-    // (Sesuaikan jika Anda memiliki DDL layanan.tindakan_medis)
     // =========================================================================
     'tindakan' => [
-        'table'       => 'layanan.tindakan_medis',
+        'table'       => ($dbName !== '') ? "tindakan_medis" : "`layanan`.`tindakan_medis`",
         'columns'     => [
             'accession_number'    => 'ID',
             'norm'                => 'NORM',
@@ -56,7 +58,7 @@ return [
     // TABEL 3: Hasil Pemeriksaan Radiologi
     // =========================================================================
     'hasil_rad' => [
-        'table'       => 'hasil_rad',
+        'table'       => $tableHasilRad,
         'columns'     => [
             'accession_number'    => 'TINDAKAN_MEDIS',  // char(11) UNIQUE KEY
             'tanggal_pemeriksaan' => 'TANGGAL',
@@ -82,7 +84,7 @@ return [
     // TABEL 4: Log Transaksi HL7 PACS
     // =========================================================================
     'hl7_logs' => [
-        'table'       => 'hl7_logs',
+        'table'       => $tableHl7Logs,
         'columns'     => [
             'ref_id'       => 'REF_ID',
             'jenis'        => 'JENIS',
