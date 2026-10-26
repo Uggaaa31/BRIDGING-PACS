@@ -138,7 +138,33 @@ BRIDGING-PACS/
 
 ---
 
-## 🚀 Panduan Instalasi & Menjalankan
+## 🐳 Deployment Cepat Menggunakan Docker (Rekomendasi Produksi)
+
+Seluruh sistem (Python MLLP Middleware + PHP Apache API) dapat dijalankan secara terisolasi dan otomatis dengan **Docker & Docker Compose**:
+
+```bash
+# 1. Salin template environment produksi
+copy .env.example .env
+
+# 2. Sesuaikan konfigurasi IP Database SIMGOS RS di .env:
+#    SIMGOS_DB_HOST=10.10.160.99
+#    SIMGOS_DB_PASS=rahasia_database
+
+# 3. Jalankan seluruh layanan di latar belakang
+docker compose up -d --build
+
+# 4. Cek status kontainer dan log
+docker compose ps
+docker compose logs -f pacs-middleware
+```
+
+Layanan otomatis aktif:
+- **MLLP Listener**: `0.0.0.0:2575` (siap menerima data HL7 dari PACS)
+- **SIMGOS REST API**: `http://localhost:8080/api/v1`
+
+---
+
+## 🚀 Panduan Instalasi Manual (Tanpa Docker)
 
 ### Prasyarat
 - **Python**: 3.8+ (disertai `pip`)

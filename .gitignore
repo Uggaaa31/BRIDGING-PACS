@@ -19,6 +19,8 @@ simgos-api/logs/
 middleware/.env
 simgos-api/.env
 *.env
+!.env.example
+!middleware/.env.example
 
 # IDE / Editor
 .vscode/
