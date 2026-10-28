@@ -1,0 +1,21 @@
+{
+  "norm": "99001234",
+  "nama": "BAMBANG WAHONO SUHARTO",
+  "tanggal_lahir": "1978-03-15",
+  "jenis_kelamin": "1",
+  "accession_number": "RAD18021914",
+  "kode_tindakan": "24630-5",
+  "nama_tindakan": "CT Scan Thoraks",
+  "tanggal_pemeriksaan": "2026-10-28 18:02:00",
+  "dokter_pengirim": "dr. MUHAMMAD HIDAYAT, Sp.PD",
+  "klinis": "Batuk berkepanjangan > 3 minggu. Riwayat kontak TB. Demam subfebris.",
+  "hasil": "Kavitas diameter +/-10cm.",
+  "kesan": "TB Paru aktif dengan kavitas lobus kanan atas.",
+  "usul": "Saran pemeriksaan sputum BTA. Konsultasi paru.",
+  "btk": "",
+  "kritis": 1,
+  "dokter_id": 0,
+  "dokter_nama": "",
+  "oleh": 0,
+  "pacs_hook_uid": "1.2.840.113619.2.55.3.20261028180219"
+}

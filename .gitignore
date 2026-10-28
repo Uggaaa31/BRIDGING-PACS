@@ -21,6 +21,9 @@ simgos-api/.env
 *.env
 !.env.example
 
+# Testing artifacts
+testing/.snapshots/
+
 # IDE / Editor
 .vscode/
 .idea/
@@ -29,6 +32,7 @@ simgos-api/.env
 *.njsproj
 *.sln
 *.sw?
+.codegraph/
 
 # OS generated files
 Thumbs.db
