@@ -263,6 +263,46 @@ Simulator akan:
 
 ---
 
+## 📜 Riwayat PUT/POST dari Docker
+Setiap request HTTP ke SIMGOS dicatat sebagai satu baris `RIWAYAT` di **stdout container**, sehingga bisa dipantau tanpa masuk ke container:
+```bash
+# Semua riwayat request
+docker logs pacs-middleware 2>&1 | grep RIWAYAT
+
+# Hanya yang berhasil
+docker logs pacs-middleware 2>&1 | grep "RIWAYAT.*OK"
+
+# Hanya yang gagal
+docker logs pacs-middleware 2>&1 | grep "RIWAYAT.*GAGAL"
+
+# Riwayat accession tertentu
+docker logs pacs-middleware 2>&1 | grep "acc=RADHL7DEMO1"
+
+# Ikuti real-time
+docker logs -f pacs-middleware 2>&1 | grep --line-buffered RIWAYAT
+```
+Format baris:
+```text
+2026-10-29 08:03:24+0000 | INFO | riwayat | RIWAYAT #1 PUT OK | acc=123456777 | msg=MSG123456777 | type=ORU^R01 | HTTP 200 | 335.6ms | attempt=1 | url=http://simgos-api/api/v1/radiologi/pacs-bridging/123456777 | hl7_log_id=72
+```
+|Field|Arti|
+|---|---|
+|`#N`|Nomor urut request sejak container start|
+|`MULAI` / `OK` / `RETRY` / `GAGAL` / `DITOLAK`|Tahap request. `MULAI` dan `OK` memakai nomor urut yang sama. `DITOLAK` = payload tanpa accession/NORM, tidak ada request yang dikirim|
+|`acc=`|Accession number (identifier URL)|
+|`msg=` / `type=`|`MSH-10` dan `MSH-9` pesan HL7 asal|
+|`HTTP` / `attempt`|Status HTTP dan percobaan ke-berapa|
+|`hl7_log_id=`|ID baris `ris.hl7_logs` hasil penyimpanan (untuk penelusuran balik)|
+|`error=`|Pesan kegagalan (hanya pada `GAGAL`)|
+
+Catatan operasional:
+- Semua log juga ditulis ke `middleware/logs/bridging_pacs.log` (rotasi 10 MB × 5) dan tetap tampil di `docker logs`.
+- Log container memakai rotasi `json-file` 10 MB × 5 (lihat `docker-compose.yml`), tidak tumbuh tanpa batas.
+- Timestamp memakai offset eksplisit (`+0000` = UTC di container). Jam dinding RS WITA = UTC+8.
+- `docker logs` hanya menyimpan riwayat sejak container dibuat; riwayat permanen ada di `ris.hl7_logs` dan file log host.
+
+---
+
 ## 🛡️ Idempotensi & Keamanan
 - **Idempotensi Database**: Semua operasi penyimpanan menggunakan `INSERT ... ON DUPLICATE KEY UPDATE` berdasarkan unique constraint `TINDAKAN_MEDIS`. Pengiriman ulang pesan yang sama dari PACS tidak akan menduplikasi baris database, melainkan memperbarui record.
 - **Teks laporan tidak pernah dikosongkan**: Kolom `KLINIS`, `KESAN`, `USUL`, `HASIL`, dan `BTK` hanya ditimpa bila payload membawa nilai tidak kosong. Kiriman ulang parsial (mis. hanya `accession_number` + `pacs_hook_uid`) tidak menghapus hasil ekspertise yang sudah tersimpan.

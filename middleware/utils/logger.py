@@ -2,13 +2,19 @@
 logger.py - Structured Logging Utility
 ======================================
 Rotasi file log otomatis, format terstruktur dengan timestamp.
+
+Handler dipasang SEKALI pada root logger sehingga semua modul
+(main, mllp_server, converter, simgos_api, ...) menulis ke konsol
+(docker logs) DAN file secara konsisten. Tanpa ini, hanya logger
+pertama yang punya handler dan pesan INFO modul lain hilang.
 """
 
 import logging
 import os
+import sys
+from datetime import datetime
 from logging.handlers import RotatingFileHandler
 
-import sys
 if hasattr(sys.stdout, "reconfigure"):
     sys.stdout.reconfigure(encoding="utf-8", errors="replace")
 if hasattr(sys.stderr, "reconfigure"):
@@ -21,38 +27,45 @@ from config.settings import (
 )
 
 _logger_initialized = False
-_app_logger = None
 
 
-def get_logger(name: str = "pacs_bridge") -> logging.Logger:
+class _OffsetFormatter(logging.Formatter):
     """
-    Mengembalikan logger yang sudah dikonfigurasi.
-    Dipanggil sekali, lalu di-cache.
+    Formatter yang menuliskan offset zona waktu eksplisit, mis. `2026-10-29 08:00:19+0000`.
+    Container berjalan di UTC sementara jam dinding RS WITA — offset mencegah
+    salah baca saat riwayat di `docker logs` dibandingkan dengan jam operator.
     """
-    global _logger_initialized, _app_logger
 
-    logger = logging.getLogger(name)
+    def formatTime(self, record, datefmt=None):
+        return datetime.fromtimestamp(record.created).astimezone().strftime(
+            "%Y-%m-%d %H:%M:%S%z"
+        )
 
+
+def _configure_root() -> None:
+    """Pasang handler konsol + file pada root logger, sekali saja."""
+    global _logger_initialized
     if _logger_initialized:
-        return logger
+        return
 
-    # Pastikan direktori log ada
     os.makedirs(LOG_DIR, exist_ok=True)
     log_path = os.path.join(LOG_DIR, LOG_FILE_NAME)
 
     level = getattr(logging, LOG_LEVEL.upper(), logging.INFO)
-    logger.setLevel(level)
 
-    # ── FORMAT ───────────────────────────────────────────────────────────────
-    fmt = logging.Formatter(
-        fmt="%(asctime)s | %(levelname)-8s | %(name)s | %(message)s",
-        datefmt="%Y-%m-%d %H:%M:%S"
-    )
+    fmt = _OffsetFormatter(fmt="%(asctime)s | %(levelname)-8s | %(name)s | %(message)s")
 
-    # ── HANDLER: Konsol ───────────────────────────────────────────────────────
-    console_handler = logging.StreamHandler()
+    root = logging.getLogger()
+    root.setLevel(level)
+
+    # Hindari duplikasi bila modul di-reload
+    for handler in list(root.handlers):
+        root.removeHandler(handler)
+
+    # ── HANDLER: Konsol (tertangkap `docker logs`) ───────────────────────────
+    console_handler = logging.StreamHandler(stream=sys.stdout)
     console_handler.setFormatter(fmt)
-    logger.addHandler(console_handler)
+    root.addHandler(console_handler)
 
     # ── HANDLER: File dengan Rotasi ───────────────────────────────────────────
     file_handler = RotatingFileHandler(
@@ -62,10 +75,21 @@ def get_logger(name: str = "pacs_bridge") -> logging.Logger:
         encoding="utf-8"
     )
     file_handler.setFormatter(fmt)
-    logger.addHandler(file_handler)
+    root.addHandler(file_handler)
+
+    # Library pihak ketiga: cukup WARNING agar riwayat PUT tidak tenggelam
+    logging.getLogger("urllib3").setLevel(logging.WARNING)
 
     _logger_initialized = True
-    _app_logger = logger
+    logging.getLogger("main").info(
+        f"Logger aktif | level={LOG_LEVEL} | file={log_path} | tz={datetime.now().astimezone().tzname()}"
+    )
 
-    logger.info(f"Logger aktif | level={LOG_LEVEL} | file={log_path}")
-    return logger
+
+def get_logger(name: str = "pacs_bridge") -> logging.Logger:
+    """
+    Mengembalikan logger bernama yang sudah terhubung ke handler root.
+    Level mengikuti LOG_LEVEL (diwarisi dari root).
+    """
+    _configure_root()
+    return logging.getLogger(name)

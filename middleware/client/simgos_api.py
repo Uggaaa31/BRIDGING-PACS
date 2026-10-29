@@ -6,7 +6,9 @@ ke endpoint PUT SIMGOS dengan retry logic dan logging transaksi.
 """
 
 from __future__ import annotations
+import itertools
 import json
+import threading
 import time
 from datetime import datetime
 from typing import Optional
@@ -30,6 +32,35 @@ from hl7.converter import SimgosPayload
 from utils.logger import get_logger
 
 log = get_logger("simgos_api")
+history = get_logger("riwayat")   # jejak satu baris per HTTP request (grep "RIWAYAT")
+
+# Nomor urut request agar riwayat di `docker logs` bisa diurutkan & dihitung
+_req_seq = itertools.count(1)
+_seq_lock = threading.Lock()
+
+def _next_seq() -> int:
+    with _seq_lock:
+        return next(_req_seq)
+
+def _history_line(
+    seq: int,
+    outcome: str,
+    identifier: str,
+    method: str,
+    url: str,
+    msg_id: str,
+    msg_type: str,
+    status: int,
+    duration_ms: float,
+    attempt: int,
+    detail: str = "",
+) -> None:
+    """Satu baris riwayat per HTTP request — terlihat di `docker logs`."""
+    history.info(
+        f"RIWAYAT #{seq} {method} {outcome} | acc={identifier} | msg={msg_id} "
+        f"| type={msg_type} | HTTP {status} | {duration_ms:.1f}ms | attempt={attempt} "
+        f"| url={url}{detail}"
+    )
 
 
 # ---------------------------------------------------------------------------
@@ -121,14 +152,28 @@ def send_to_simgos(payload: SimgosPayload) -> ApiResponse:
     if not identifier:
         error_msg = "Tidak ada identifier valid (accession_number atau NORM) untuk PUT request."
         log.error(error_msg)
+        _history_line(
+            _next_seq(), "DITOLAK", "-", "PUT", "-",
+            payload.message_control_id or "-", payload.message_type or "-",
+            0, 0.0, 0, f" | error={error_msg}",
+        )
         return ApiResponse(success=False, error=error_msg)
 
     url         = _build_url(identifier)
     headers     = _build_headers()
     payload_dict = payload.to_dict()
 
-    log.info(f"→ PUT {url} | Payload: {len(json.dumps(payload_dict))} bytes")
+    seq       = _next_seq()
+    msg_id    = payload.message_control_id or "-"
+    msg_type  = payload.message_type or "-"
+    n_bytes   = len(json.dumps(payload_dict))
+
+    log.info(f"→ PUT {url} | Payload: {n_bytes} bytes")
     log.debug(f"Payload JSON:\n{json.dumps(payload_dict, indent=2, ensure_ascii=False)}")
+    _history_line(
+        seq, "MULAI", identifier, "PUT", url, msg_id, msg_type, 0, 0.0, 0,
+        f" | bytes={n_bytes}",
+    )
 
     last_error = ""
     last_status = 0
@@ -163,6 +208,11 @@ def send_to_simgos(payload: SimgosPayload) -> ApiResponse:
                     f"✓ PUT berhasil | status={response.status_code} | "
                     f"duration={duration_ms:.1f}ms | attempt={attempt}"
                 )
+                _history_line(
+                    seq, "OK", identifier, "PUT", url, msg_id, msg_type,
+                    response.status_code, duration_ms, attempt,
+                    f" | hl7_log_id={resp_body.get('data', {}).get('hl7_log_id', '-')}",
+                )
                 return ApiResponse(
                     success=True,
                     status_code=response.status_code,
@@ -183,6 +233,11 @@ def send_to_simgos(payload: SimgosPayload) -> ApiResponse:
                 # Jangan retry untuk error 4xx (client error)
                 if 400 <= response.status_code < 500:
                     log.error(f"HTTP 4xx — tidak ada retry. error={last_error}")
+                    _history_line(
+                        seq, "GAGAL", identifier, "PUT", url, msg_id, msg_type,
+                        response.status_code, duration_ms, attempt,
+                        f" | error={last_error}",
+                    )
                     return ApiResponse(
                         success=False,
                         status_code=response.status_code,
@@ -208,6 +263,10 @@ def send_to_simgos(payload: SimgosPayload) -> ApiResponse:
 
         # Tunggu sebelum retry (kecuali attempt terakhir)
         if attempt < SIMGOS_API_MAX_RETRIES:
+            _history_line(
+                seq, "RETRY", identifier, "PUT", url, msg_id, msg_type,
+                last_status, duration_ms, attempt, f" | error={last_error}",
+            )
             log.info(f"Menunggu {SIMGOS_API_RETRY_DELAY_SEC}s sebelum retry...")
             time.sleep(SIMGOS_API_RETRY_DELAY_SEC)
 
@@ -215,6 +274,10 @@ def send_to_simgos(payload: SimgosPayload) -> ApiResponse:
     log.error(
         f"✗✗ PUT GAGAL setelah {SIMGOS_API_MAX_RETRIES} attempt | "
         f"URL={url} | error={last_error}"
+    )
+    _history_line(
+        seq, "GAGAL", identifier, "PUT", url, msg_id, msg_type,
+        last_status, duration_ms, SIMGOS_API_MAX_RETRIES, f" | error={last_error}",
     )
     return ApiResponse(
         success=False,

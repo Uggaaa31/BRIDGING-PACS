@@ -103,13 +103,19 @@ class HL7RequestHandler(socketserver.BaseRequestHandler):
 
             if api_resp.success:
                 ack = build_aa(msg_control_id)
-                log.info(f"[{client_addr}] ✓ ACK AA dikirim ke PACS.")
+                log.info(
+                    f"[{client_addr}] ✓ ACK AA dikirim ke PACS | "
+                    f"acc={payload.accession_number} | HTTP {api_resp.status_code}"
+                )
             else:
                 ack = build_ae(
                     msg_control_id,
                     f"SIMGOS API error: {api_resp.error}"
                 )
-                log.warning(f"[{client_addr}] ✗ ACK AE dikirim ke PACS: {api_resp.error}")
+                log.warning(
+                    f"[{client_addr}] ✗ ACK AE dikirim ke PACS: {api_resp.error} | "
+                    f"acc={payload.accession_number}"
+                )
 
             # ── Kirim ACK ────────────────────────────────────────────────────
             self.request.sendall(wrap_with_mllp(ack))

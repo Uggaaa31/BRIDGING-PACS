@@ -23,6 +23,13 @@ services:
       - ./middleware/logs:/app/logs               # Persistensi log ke host
     depends_on:
       - simgos-api
+    # Riwayat PUT/POST dibaca lewat `docker logs`. Rotasi wajib agar
+    # json-file tidak tumbuh tanpa batas: 5 x 10 MB = 50 MB.
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "5"
     networks:
       - pacs-bridge-net
 
@@ -48,6 +55,12 @@ services:
       - ./simgos-api/logs:/var/www/html/logs      # Persistensi log ke host
     extra_hosts:
       - "host.docker.internal:host-gateway"       # Kompatibilitas akses host MySQL
+    # Apache access log (stdout) juga memuat baris PUT/POST. Rotasi sama.
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "5"
     networks:
       - pacs-bridge-net
 
