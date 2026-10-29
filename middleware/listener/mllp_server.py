@@ -79,6 +79,16 @@ class HL7RequestHandler(socketserver.BaseRequestHandler):
                 self.request.sendall(wrap_with_mllp(ack))
                 return
 
+            # ── Tolak pesan selain ORU: hanya ORU^R01 yang berisi hasil radiologi ──
+            if hl7_msg.message_type() != "ORU^R01":
+                log.warning(
+                    f"[{client_addr}] Pesan ditolak | type={hl7_msg.message_type()} "
+                    f"| hanya ORU^R01 yang diproses"
+                )
+                ack = build_ae(msg_control_id, f"Unsupported message type: {hl7_msg.message_type()}")
+                self.request.sendall(wrap_with_mllp(ack))
+                return
+
             # ── Konversi HL7 → SIMGOS Payload ────────────────────────────────
             try:
                 payload = convert_hl7_to_simgos(hl7_msg)

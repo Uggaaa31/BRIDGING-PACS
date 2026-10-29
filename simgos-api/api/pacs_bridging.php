@@ -192,7 +192,7 @@ try {
     $refId       = substr($identifier, 0, 11);                             // char(11)
     $kode        = substr($payload['kode_tindakan'] ?? '', 0, 10);        // char(10)
     $provider    = PACS_PROVIDER;
-    $jenisLog    = Hl7LogModel::JENIS_ORU;                                 // 1 = ORU
+    $jenisLog    = sanitizeInt($payload['jenis_log'] ?? Hl7LogModel::JENIS_ORU);
 
     $logId = $hl7LogModel->insert(
         refId:    $refId,

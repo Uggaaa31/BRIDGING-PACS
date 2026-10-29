@@ -126,7 +126,7 @@ BRIDGING-PACS/
 |---|---|---|
 | `ID` | `int AUTO_INCREMENT` | Primary Key |
 | `REF_ID` | `char(11)` | Accession Number (`TINDAKAN_MEDIS`) |
-| `JENIS` | `tinyint` | `0` = ORM (Order), `1` = ORU (Hasil Observasi) |
+| `JENIS` | `tinyint` | `0` = ORM (Order), `1` = ORU (Hasil Observasi) — diisi dari tipe pesan HL7 (`MSH-9`). Middleware hanya menerima `ORU^R01`; pesan lain dijawab ACK `AE` dan tidak menulis apa pun. |
 | `PROVIDER` | `varchar(50)` | Identitas pengirim (misal: `PACS_RADIOLOGI`) |
 | `KODE` | `char(10)` | Kode prosedur pemeriksaan (`OBR-4.1`) |
 | `TGL_REQUEST` | `datetime` | Waktu pesan diterima dari PACS |
@@ -265,6 +265,8 @@ Simulator akan:
 
 ## 🛡️ Idempotensi & Keamanan
 - **Idempotensi Database**: Semua operasi penyimpanan menggunakan `INSERT ... ON DUPLICATE KEY UPDATE` berdasarkan unique constraint `TINDAKAN_MEDIS`. Pengiriman ulang pesan yang sama dari PACS tidak akan menduplikasi baris database, melainkan memperbarui record.
+- **Teks laporan tidak pernah dikosongkan**: Kolom `KLINIS`, `KESAN`, `USUL`, `HASIL`, dan `BTK` hanya ditimpa bila payload membawa nilai tidak kosong. Kiriman ulang parsial (mis. hanya `accession_number` + `pacs_hook_uid`) tidak menghapus hasil ekspertise yang sudah tersimpan.
+- **Hanya `ORU^R01` diproses**: Pesan tipe lain (mis. `ORM^O01`) ditolak dengan ACK `AE` (`Unsupported message type: ...`) sehingga tidak ada baris `hasil_rad` maupun `hl7_logs` yang terbentuk.
 - **Audit Trail Terisolasi**: Setiap payload HL7 mentah dicatat ke tabel `ris.hl7_logs` sebelum disimpan ke tabel utama, memudahkan audit jika terjadi inkonsistensi data klinis.
 - **API Authentication**: Endpoint API dilindungi oleh validasi `X-API-KEY` atau Bearer Token.
 

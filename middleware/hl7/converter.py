@@ -74,6 +74,7 @@ class SimgosPayload:
         # === Metadata ===
         self.message_control_id: Optional[str] = None
         self.message_type: Optional[str]       = None
+        self.jenis_log: int = 1                      # ris.hl7_logs.JENIS: 0=ORM, 1=ORU
         self.converted_at: str = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
 
     def to_dict(self) -> dict:
@@ -528,6 +529,7 @@ def convert_hl7_to_simgos(msg: HL7Message) -> SimgosPayload:
     # ── Metadata pesan ───────────────────────────────────────────────────────
     payload.message_control_id = msg.message_control_id()
     payload.message_type = msg.message_type()
+    payload.jenis_log = 0 if payload.message_type.startswith("ORM") else 1
     log.info(f"Mulai konversi | MsgType={payload.message_type} | MsgID={payload.message_control_id}")
 
     pid = msg.PID

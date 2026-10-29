@@ -81,12 +81,14 @@ class HasilRadModel {
             $data['dokter_id'] = 0;
         }
 
-        // ── Pastikan kolom text yang NOT NULL di database tidak bernilai null ──
-        $data['klinis'] = $data['klinis'] ?? '';
-        $data['kesan']  = $data['kesan']  ?? '';
-        $data['usul']   = $data['usul']   ?? '';
-        $data['hasil']  = $data['hasil']  ?? '';
-        $data['btk']    = $data['btk']    ?? '';
+        // ── Kolom teks: nilai kosong/null tidak dikirim sama sekali ───────────
+        // INSERT memakai default kolom; UPDATE melewati kolom ini sehingga teks
+        // laporan yang sudah ada tidak pernah tertimpa string kosong.
+        foreach (['klinis', 'kesan', 'usul', 'hasil', 'btk'] as $textCol) {
+            if (empty($data[$textCol])) {
+                unset($data[$textCol]);
+            }
+        }
 
         // ── Batasi DIKIRIM_DARI (char 36) hanya 36 karakter ──────────────────
         if (!empty($data['pacs_hook_uid'])) {
@@ -117,6 +119,9 @@ class HasilRadModel {
                 // DIKIRIM_DARI: hanya update jika nilai baru tidak kosong
                 // Fungsi SQL IF() mencegah penimpaan dengan string kosong
                 $updateParts[] = "`{$colName}` = IF(VALUES(`{$colName}`) != '' AND VALUES(`{$colName}`) IS NOT NULL, VALUES(`{$colName}`), `{$colName}`)";
+            } elseif (in_array($alias, ['klinis', 'kesan', 'usul', 'hasil', 'btk'], true)) {
+                // Teks laporan: hanya timpa jika nilai baru tidak kosong
+                $updateParts[] = "`{$colName}` = IF(VALUES(`{$colName}`) != '', VALUES(`{$colName}`), `{$colName}`)";
             } elseif ($alias === 'otomatis') {
                 // OTOMATIS: tetap 1 jika sudah 1, tidak perlu diupdate terus
                 $updateParts[] = "`{$colName}` = 1";
