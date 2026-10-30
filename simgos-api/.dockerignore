@@ -1,0 +1,5 @@
+# Jangan pernah masukkan log (berisi data pasien) atau secret ke image
+logs/
+*.log
+.env
+.env.*

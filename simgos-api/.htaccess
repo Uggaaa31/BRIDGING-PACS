@@ -12,6 +12,16 @@ RewriteRule ^(?:simgos-api/)?api/v1/radiologi/pacs-bridging/(.+)$ api/pacs_bridg
 # Keamanan: Blokir akses langsung ke config dan model
 RewriteRule ^(?:simgos-api/)?(config|models)/.*$ - [F,L]
 
+# Keamanan: blokir akses HTTP ke direktori log (berisi data pasien)
+RewriteRule ^(?:simgos-api/)?logs(/|$) - [F,L]
+
+# Lapisan kedua: tolak unduhan file .log di mana pun dalam webroot
+<IfModule mod_authz_core.c>
+    <FilesMatch "\.log$">
+        Require all denied
+    </FilesMatch>
+</IfModule>
+
 # Header keamanan
 <IfModule mod_headers.c>
     Header always set X-Content-Type-Options "nosniff"

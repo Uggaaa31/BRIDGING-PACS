@@ -51,8 +51,9 @@ services:
       - SIMGOS_DB_USER=${SIMGOS_DB_USER:-root}
       - SIMGOS_DB_PASS=${SIMGOS_DB_PASS:-}
       - SIMGOS_API_KEY=${SIMGOS_API_KEY:?SIMGOS_API_KEY wajib diisi di .env}
+      - SIMGOS_API_LOG_FILE=/var/log/simgos/simgos_api.log   # Di luar DocumentRoot
     volumes:
-      - ./simgos-api/logs:/var/www/html/logs      # Persistensi log ke host
+      - ./simgos-api/logs:/var/log/simgos         # Persistensi log ke host
     extra_hosts:
       - "host.docker.internal:host-gateway"       # Kompatibilitas akses host MySQL
     # Apache access log (stdout) juga memuat baris PUT/POST. Rotasi sama.

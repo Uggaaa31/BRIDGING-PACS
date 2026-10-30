@@ -24,6 +24,11 @@ RUN mkdir -p /var/www/html/logs \
     && chmod -R 755 /var/www/html \
     && chmod -R 775 /var/www/html/logs
 
+# Log API disimpan di luar DocumentRoot agar tidak bisa diakses lewat HTTP
+RUN mkdir -p /var/log/simgos \
+    && chown -R www-data:www-data /var/log/simgos \
+    && chmod 775 /var/log/simgos
+
 # Expose HTTP port
 EXPOSE 80
 
