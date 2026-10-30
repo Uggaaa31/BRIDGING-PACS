@@ -109,7 +109,11 @@ def _build_headers() -> dict:
     elif SIMGOS_AUTH_TYPE == "api_key" and SIMGOS_API_KEY:
         headers["X-Api-Key"] = SIMGOS_API_KEY
     else:
-        log.warning("Tidak ada konfigurasi autentikasi yang valid untuk API SIMGOS.")
+        # Fail-closed: jangan pernah mengirim request tanpa kredensial.
+        raise RuntimeError(
+            "Konfigurasi autentikasi SIMGOS tidak valid: SIMGOS_API_KEY / "
+            "SIMGOS_API_TOKEN kosong."
+        )
 
     return headers
 

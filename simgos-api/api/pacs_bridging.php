@@ -29,7 +29,8 @@ require_once __DIR__ . '/../models/HasilRadModel.php';
 require_once __DIR__ . '/../models/Hl7LogModel.php';
 
 // ─── Konfigurasi ─────────────────────────────────────────────────────────────
-define('API_KEY_VALID',  getenv('SIMGOS_API_KEY') ?: 'PACS-BRIDGE-SECRET-KEY-2024');
+// Tidak ada nilai default: API key wajib diisi lewat environment (fail-closed).
+define('API_KEY_VALID',  getenv('SIMGOS_API_KEY') ?: '');
 define('PACS_PROVIDER',  getenv('PACS_PROVIDER_NAME') ?: 'PACS');
 define('API_LOG_FILE',   __DIR__ . '/../logs/simgos_api.log');
 
@@ -74,6 +75,14 @@ if ($_SERVER['REQUEST_METHOD'] !== 'PUT') {
 }
 
 // ─── 2. Validasi Autentikasi API Key ─────────────────────────────────────────
+// Fail-closed: server tanpa API key terkonfigurasi tidak menerima request apa pun.
+if (API_KEY_VALID === '') {
+    writeLog('error', 'SIMGOS_API_KEY belum dikonfigurasi — request ditolak', [
+        'ip' => $_SERVER['REMOTE_ADDR'] ?? '?',
+    ]);
+    sendResponse(503, false, 'Layanan belum dikonfigurasi.');
+}
+
 $apiKeyHeader = $_SERVER['HTTP_X_API_KEY']
     ?? $_SERVER['HTTP_AUTHORIZATION']
     ?? '';

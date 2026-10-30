@@ -69,7 +69,7 @@ Dikirim oleh middleware Python:
 
 ```http
 PUT /api/v1/radiologi/pacs-bridging/RADHL7DEMO1
-X-Api-Key: PACS-BRIDGE-SECRET-KEY-2024
+X-Api-Key: <ISI_API_KEY>
 Content-Type: application/json
 ```
 

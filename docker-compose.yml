@@ -15,7 +15,7 @@ services:
       - MLLP_PORT=${MLLP_PORT:-2575}
       - SIMGOS_API_BASE_URL=${SIMGOS_API_BASE_URL:-http://simgos-api/api/v1}
       - SIMGOS_AUTH_TYPE=${SIMGOS_AUTH_TYPE:-api_key}
-      - SIMGOS_API_KEY=${SIMGOS_API_KEY:-PACS-BRIDGE-SECRET-KEY-2024}
+      - SIMGOS_API_KEY=${SIMGOS_API_KEY:?SIMGOS_API_KEY wajib diisi di .env}
       - SIMGOS_API_TIMEOUT=${SIMGOS_API_TIMEOUT:-15}
       - SIMGOS_API_MAX_RETRIES=${SIMGOS_API_MAX_RETRIES:-3}
       - LOG_LEVEL=${LOG_LEVEL:-INFO}
@@ -50,7 +50,7 @@ services:
       - SIMGOS_DB_NAME=${SIMGOS_DB_NAME:-}
       - SIMGOS_DB_USER=${SIMGOS_DB_USER:-root}
       - SIMGOS_DB_PASS=${SIMGOS_DB_PASS:-}
-      - SIMGOS_API_KEY=${SIMGOS_API_KEY:-PACS-BRIDGE-SECRET-KEY-2024}
+      - SIMGOS_API_KEY=${SIMGOS_API_KEY:?SIMGOS_API_KEY wajib diisi di .env}
     volumes:
       - ./simgos-api/logs:/var/www/html/logs      # Persistensi log ke host
     extra_hosts:

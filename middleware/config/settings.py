@@ -32,9 +32,22 @@ SIMGOS_API_BASE_URL = os.getenv(
 SIMGOS_API_ENDPOINT_BRIDGING = "/radiologi/pacs-bridging"  # Endpoint PUT
 
 # Autentikasi — pilih salah satu: Bearer Token atau API Key
+# Tidak ada nilai default: kredensial wajib diisi lewat .env / environment.
 SIMGOS_AUTH_TYPE = os.getenv("SIMGOS_AUTH_TYPE", "api_key")  # "bearer" | "api_key"
-SIMGOS_API_KEY   = os.getenv("SIMGOS_API_KEY",   "PACS-BRIDGE-SECRET-KEY-2024")
+SIMGOS_API_KEY   = os.getenv("SIMGOS_API_KEY",   "")
 SIMGOS_API_TOKEN = os.getenv("SIMGOS_API_TOKEN", "")         # Jika pakai Bearer
+
+# Fail-closed: middleware tidak boleh berjalan tanpa kredensial yang valid.
+_AUTH_CONFIG_VALID = (
+    (SIMGOS_AUTH_TYPE == "bearer" and bool(SIMGOS_API_TOKEN))
+    or (SIMGOS_AUTH_TYPE == "api_key" and bool(SIMGOS_API_KEY))
+)
+if not _AUTH_CONFIG_VALID:
+    raise RuntimeError(
+        "Konfigurasi autentikasi SIMGOS tidak valid. Set SIMGOS_API_KEY "
+        "(atau SIMGOS_API_TOKEN dengan SIMGOS_AUTH_TYPE=bearer) di .env. "
+        "Middleware tidak dijalankan tanpa kredensial."
+    )
 
 SIMGOS_API_TIMEOUT_SECONDS = int(os.getenv("SIMGOS_API_TIMEOUT", "15"))
 SIMGOS_API_MAX_RETRIES     = int(os.getenv("SIMGOS_API_MAX_RETRIES", "3"))

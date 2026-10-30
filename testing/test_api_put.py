@@ -19,6 +19,7 @@ Penggunaan:
 import requests
 import json
 import argparse
+import os
 import sys
 from datetime import datetime
 
@@ -143,13 +144,19 @@ def main():
     )
     parser.add_argument('--url',  default='http://localhost/simgos-api/api/v1',
                         help='Base URL API SIMGOS')
-    parser.add_argument('--key',  default='PACS-BRIDGE-SECRET-KEY-2024',
-                        help='API Key autentikasi')
+    parser.add_argument('--key',  default=os.getenv('SIMGOS_API_KEY'),
+                        help='API Key autentikasi (default: env SIMGOS_API_KEY)')
     parser.add_argument('--norm', default='123456',
                         help='NORM pasien untuk test')
     parser.add_argument('--acc',  default=None,
                         help='Accession number (default: auto-generate)')
     args = parser.parse_args()
+
+    if not args.key:
+        sys.exit(
+            "API key kosong. Set environment SIMGOS_API_KEY "
+            "atau jalankan dengan --key <API_KEY>."
+        )
 
     accession = args.acc or f"ACC-{datetime.now().strftime('%Y%m%d%H%M%S')}"
     payload   = build_test_payload(args.norm, accession)
