@@ -7,7 +7,11 @@ Untuk setiap pesan HL7 yang diterima:
   2. Parse HL7 Message
   3. Konversi ke payload SIMGOS
   4. Kirim HTTP PUT ke API SIMGOS
-  5. Kirim ACK kembali ke PACS
+  5. Bila SIMGOS tidak merespons (timeout/jaringan/5xx): simpan ke antrean
+     lokal (spooler) dan balas ACK AA — data dijamin tidak hilang, dikirim
+     ulang oleh spool_worker saat SIMGOS normal.
+  6. Bila data ditolak (4xx): balas ACK AE seperti biasa.
+  7. Kirim ACK kembali ke PACS
 
 Mendukung multiple concurrent connections menggunakan ThreadingTCPServer.
 """
@@ -22,10 +26,27 @@ from config.settings import MLLP_HOST, MLLP_PORT, MLLP_BUFFER_SIZE, MLLP_TIMEOUT
 from hl7.parser import extract_from_mllp, wrap_with_mllp, HL7Message, HL7ParseError
 from hl7.converter import convert_hl7_to_simgos
 from hl7.ack_builder import build_aa, build_ae
-from client.simgos_api import send_to_simgos
+from client.simgos_api import send_to_simgos, is_retryable_failure
+from spooler import queue_manager as spooler
 from utils.logger import get_logger
 
 log = get_logger("mllp_server")
+
+# Teks MSA-3 saat data ditahan di antrean lokal (bukan error di sisi PACS).
+QUEUED_ACK_TEXT = "Accepted and queued for background synchronization"
+
+
+def _enqueue_to_spool(payload, error_reason: str) -> bool:
+    """
+    Simpan payload ke antrean lokal. Mengembalikan False bila penyimpanan
+    disk gagal — dalam kasus itu PACS HARUS menerima ACK AE, karena data
+    tidak dijamin aman di mana pun.
+    """
+    try:
+        return spooler.enqueue(payload, error_reason)
+    except Exception as e:
+        log.error(f"Gagal menyimpan ke antrean lokal: {e}", exc_info=True)
+        return False
 
 
 # ---------------------------------------------------------------------------
@@ -107,6 +128,25 @@ class HL7RequestHandler(socketserver.BaseRequestHandler):
                     f"[{client_addr}] ✓ ACK AA dikirim ke PACS | "
                     f"acc={payload.accession_number} | HTTP {api_resp.status_code}"
                 )
+            elif is_retryable_failure(api_resp):
+                # SIMGOS tidak merespons (timeout / koneksi putus / 5xx):
+                # tahan payload di antrean lokal, baru balas AA.
+                if _enqueue_to_spool(payload, api_resp.error):
+                    ack = build_aa(msg_control_id, text=QUEUED_ACK_TEXT)
+                    log.warning(
+                        f"[{client_addr}] ↻ SIMGOS tidak merespons ({api_resp.error}) — "
+                        f"payload DIIANTREKAN lokal, ACK AA dikirim ke PACS | "
+                        f"acc={payload.accession_number}"
+                    )
+                else:
+                    ack = build_ae(
+                        msg_control_id,
+                        f"SIMGOS API error & antrean lokal gagal: {api_resp.error}"
+                    )
+                    log.error(
+                        f"[{client_addr}] ✗ ACK AE dikirim ke PACS: antrean lokal gagal "
+                        f"menyimpan payload | acc={payload.accession_number}"
+                    )
             else:
                 ack = build_ae(
                     msg_control_id,

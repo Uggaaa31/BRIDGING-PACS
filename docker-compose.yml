@@ -18,9 +18,14 @@ services:
       - SIMGOS_API_KEY=${SIMGOS_API_KEY:?SIMGOS_API_KEY wajib diisi di .env}
       - SIMGOS_API_TIMEOUT=${SIMGOS_API_TIMEOUT:-15}
       - SIMGOS_API_MAX_RETRIES=${SIMGOS_API_MAX_RETRIES:-3}
+      # Store-and-forward: antrean lokal SQLite di volume persisten /app/data
+      - SPOOL_DB_PATH=${SPOOL_DB_PATH:-/app/data/spool.db}
+      - SPOOL_INTERVAL_SECONDS=${SPOOL_INTERVAL_SECONDS:-30}
+      - SPOOL_MAX_RETRIES=${SPOOL_MAX_RETRIES:-0}
       - LOG_LEVEL=${LOG_LEVEL:-INFO}
     volumes:
       - ./middleware/logs:/app/logs               # Persistensi log ke host
+      - ./middleware/data:/app/data               # Antrean lokal (spool.db) — tetap ada walau kontainer restart
     depends_on:
       - simgos-api
     # Riwayat PUT/POST dibaca lewat `docker logs`. Rotasi wajib agar

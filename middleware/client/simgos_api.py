@@ -67,7 +67,14 @@ def _history_line(
 # Tipe data response
 # ---------------------------------------------------------------------------
 class ApiResponse:
-    """Hasil pengiriman HTTP PUT ke SIMGOS API."""
+    """Hasil pengiriman HTTP PUT ke SIMGOS API.
+
+    `retryable` menandai klasifikasi kegagalan:
+      True  → error jaringan / timeout / HTTP 5xx (server tidak siap).
+              Pemanggil boleh menahan payload di antrean lokal (spooler).
+      False → sukses, validasi lokal, atau HTTP 4xx (data ditolak server);
+              mengirim ulang payload yang sama tidak akan pernah berhasil.
+    """
 
     def __init__(
         self,
@@ -75,21 +82,35 @@ class ApiResponse:
         status_code: int = 0,
         body: dict = None,
         error: str = "",
-        duration_ms: float = 0
+        duration_ms: float = 0,
+        retryable: bool = False
     ):
         self.success     = success
         self.status_code = status_code
         self.body        = body or {}
         self.error       = error
         self.duration_ms = duration_ms
+        self.retryable   = retryable
         self.timestamp   = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
 
     def __repr__(self) -> str:
         return (
             f"ApiResponse(success={self.success}, "
             f"status={self.status_code}, "
+            f"retryable={self.retryable}, "
             f"duration={self.duration_ms:.1f}ms)"
         )
+
+
+def is_retryable_failure(resp: ApiResponse) -> bool:
+    """
+    True bila kegagalan layak dicoba ulang nanti (jaringan/5xx).
+
+    Dipakai bersama oleh mllp_server (memutuskan ACK AA + simpan ke antrean)
+    dan spool_worker (memutuskan retry vs ABANDONED) agar klasifikasi error
+    hanya hidup di satu tempat.
+    """
+    return (not resp.success) and bool(getattr(resp, "retryable", False))
 
 
 # ---------------------------------------------------------------------------
@@ -161,7 +182,7 @@ def send_to_simgos(payload: SimgosPayload) -> ApiResponse:
             payload.message_control_id or "-", payload.message_type or "-",
             0, 0.0, 0, f" | error={error_msg}",
         )
-        return ApiResponse(success=False, error=error_msg)
+        return ApiResponse(success=False, error=error_msg, retryable=False)
 
     url         = _build_url(identifier)
     headers     = _build_headers()
@@ -181,6 +202,7 @@ def send_to_simgos(payload: SimgosPayload) -> ApiResponse:
 
     last_error = ""
     last_status = 0
+    duration_ms = 0.0
 
     for attempt in range(1, SIMGOS_API_MAX_RETRIES + 1):
         start_time = time.monotonic()
@@ -224,11 +246,8 @@ def send_to_simgos(payload: SimgosPayload) -> ApiResponse:
                     duration_ms=duration_ms
                 )
             else:
-                last_error = (
-                    resp_body.get("message")
-                    if isinstance(resp_body, dict) and "message" in resp_body
-                    else response.text[:200]
-                )
+                _msg = resp_body.get("message") if isinstance(resp_body, dict) else None
+                last_error = str(_msg) if _msg else response.text[:200]
                 log.warning(
                     f"✗ PUT gagal | status={response.status_code} | "
                     f"attempt={attempt}/{SIMGOS_API_MAX_RETRIES} | "
@@ -247,7 +266,8 @@ def send_to_simgos(payload: SimgosPayload) -> ApiResponse:
                         status_code=response.status_code,
                         body=resp_body,
                         error=last_error,
-                        duration_ms=duration_ms
+                        duration_ms=duration_ms,
+                        retryable=False,      # 4xx: data ditolak, retry tidak akan menolong
                     )
 
         except Timeout:
@@ -274,17 +294,26 @@ def send_to_simgos(payload: SimgosPayload) -> ApiResponse:
             log.info(f"Menunggu {SIMGOS_API_RETRY_DELAY_SEC}s sebelum retry...")
             time.sleep(SIMGOS_API_RETRY_DELAY_SEC)
 
-    # Semua attempt gagal
+    # Semua attempt gagal.
+    # retryable=True hanya untuk kegagalan jaringan (status 0, tidak ada respons HTTP)
+    # atau HTTP 5xx — dua kondisi di mana percobaan berikutnya masih masuk akal.
+    # Respons HTTP 2xx dengan body success=false berarti server menolak data
+    # (payload/skema), jadi tidak diulang.
+    retryable = last_status == 0 or last_status >= 500
+
     log.error(
         f"✗✗ PUT GAGAL setelah {SIMGOS_API_MAX_RETRIES} attempt | "
-        f"URL={url} | error={last_error}"
+        f"URL={url} | error={last_error} | retryable={retryable}"
     )
     _history_line(
         seq, "GAGAL", identifier, "PUT", url, msg_id, msg_type,
-        last_status, duration_ms, SIMGOS_API_MAX_RETRIES, f" | error={last_error}",
+        last_status, duration_ms, SIMGOS_API_MAX_RETRIES,
+        f" | retryable={retryable} | error={last_error}",
     )
     return ApiResponse(
         success=False,
         status_code=last_status,
-        error=last_error
+        error=last_error,
+        duration_ms=duration_ms,
+        retryable=retryable
     )

@@ -54,6 +54,29 @@ SIMGOS_API_MAX_RETRIES     = int(os.getenv("SIMGOS_API_MAX_RETRIES", "3"))
 SIMGOS_API_RETRY_DELAY_SEC = 2  # Jeda antar retry
 
 # ---------------------------------------------------------------------------
+# STORE-AND-FORWARD (Antrean Lokal / Offline Spooler)
+# ---------------------------------------------------------------------------
+# Lokasi file SQLite antrean. Default: <middleware>/data/spool.db
+# Di Docker, docker-compose menimpanya dengan /app/data/spool.db (volume persisten).
+_THIS_DIR = os.path.dirname(os.path.abspath(__file__))
+SPOOL_DB_PATH = os.getenv("SPOOL_DB_PATH") or os.path.abspath(
+    os.path.join(_THIS_DIR, "..", "data", "spool.db")
+)
+
+SPOOL_INTERVAL_SECONDS = int(os.getenv("SPOOL_INTERVAL_SECONDS", "30"))  # Interval polling worker
+SPOOL_BATCH_SIZE       = int(os.getenv("SPOOL_BATCH_SIZE", "10"))        # Pesan per putaran worker
+
+# Batas percobaan kirim ulang sebelum baris ditandai ABANDONED.
+#   0  = tanpa batas (DEFAULT) — kegagalan jaringan/5xx boleh bertahan selama
+#        SIMGOS down; data pasien tidak pernah dibuang karena waktu.
+#   >0 = batas keras, mis. 20. Ingat: interval × batas = jendela toleransi,
+#        20 retry @30 detik hanya ~10 menit — terlalu singkat untuk downtime nyata.
+# Error permanen (HTTP 4xx / payload rusak) tetap langsung ABANDONED, tidak
+# tergantung nilai ini.
+SPOOL_MAX_RETRIES      = int(os.getenv("SPOOL_MAX_RETRIES", "0"))
+
+
+# ---------------------------------------------------------------------------
 # LOGGING
 # ---------------------------------------------------------------------------
 LOG_LEVEL      = os.getenv("LOG_LEVEL", "INFO")        # DEBUG | INFO | WARNING | ERROR

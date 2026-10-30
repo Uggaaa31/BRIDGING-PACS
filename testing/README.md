@@ -15,6 +15,7 @@ testing/
 ├── check_connection.py
 ├── put_hl7.py
 ├── check_db.py
+├── test_spooler.py        uji store-and-forward (antrean lokal SQLite)
 ├── payload.json           payload PUT harian
 ├── payload_example.json   contoh payload
 └── sample_oru_message.hl7 contoh pesan HL7
@@ -256,6 +257,69 @@ Label pada mode `diff`:
 | `UPDATE` | Baris ada, sejumlah kolom berubah (nilai lama vs baru ditampilkan) |
 | `Nilai identik` | Baris ada, isi sama |
 | `HILANG` | Sebelumnya ada, sekarang 0 baris |
+
+---
+
+## 5. Uji Store-and-Forward (Offline Spooler)
+
+Saat API SIMGOS mati, middleware menyimpan payload ke antrean lokal SQLite
+(`middleware/data/spool.db`) dan tetap membalas `MSA|AA` ke PACS. Worker
+latar belakang mengirim ulang antrean itu setiap `SPOOL_INTERVAL_SECONDS`
+(default 30 detik). Detail modul: `middleware/spooler/`.
+
+### Suite otomatis (tanpa MySQL, tanpa kredensial produksi)
+
+```bash
+python testing/test_spooler.py
+```
+
+Script menjalankan 20 asersi dengan DB antrean sementara + stub HTTP API lokal:
+klasifikasi error (503/jaringan → layak retry, 422 → tidak), API mati → antrean
+terisi dan PACS dapat `AA`, dedupe pesan ganda, worker menguras antrean → `SENT`,
+retry berkali-kali → `ABANDONED`, payload rusak → `ABANDONED`, dan 4xx realtime →
+`AE` tanpa masuk antrean. Exit code `0` = lulus.
+
+### Inspeksi & kuras manual
+
+```bash
+# isi antrean: status, retry_count, error terakhir
+python testing/test_spooler.py --status
+
+# satu putaran worker ke API SIMGOS asli
+python testing/test_spooler.py --flush
+```
+
+### Uji pemulihan sungguhan (dua terminal)
+
+```bash
+# 1. Matikan API SIMGOS
+docker compose stop simgos-api
+
+# 2. Kirim HL7 -> PACS harus menerima ACK AA (bukan AE)
+python testing/put_hl7.py --file testing/sample_oru_message.hl7
+python testing/test_spooler.py --status        # ada 1 baris PENDING
+
+# 3. Hidupkan lagi API
+docker compose start simgos-api
+
+# 4. Kuras antrean tanpa menunggu interval
+python testing/test_spooler.py --flush         # baris jadi SENT
+
+# 5. Pastikan data benar-benar masuk MySQL
+python testing/check_db.py --acc <ACCESSION>
+```
+
+Atau tunggu worker: baris berpindah ke `SENT` sendiri dalam ≤ 30 detik setelah
+SIMGOS normal, tanpa restart middleware.
+
+### Uji end-to-end pada middleware yang berjalan
+
+```bash
+python testing/test_spooler.py --live --host 127.0.0.1 --port 2575
+```
+
+Mengirim ORU^R01 baru via MLLP, memastikan PACS menerima `AA`, lalu menunggu
+baris muncul di `hasil_rad` MySQL (dilewati bila DB tidak dapat diakses).
 
 ---
 

@@ -9,6 +9,7 @@ Membangun pesan HL7 ACK sesuai standar v2.x:
 
 from __future__ import annotations
 from datetime import datetime
+from typing import Optional
 import sys, os
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
@@ -19,7 +20,8 @@ def build_ack(
     original_message_control_id: str,
     success: bool = True,
     error_message: str = "",
-    ack_code: str = None
+    ack_code: Optional[str] = None,
+    text_message: Optional[str] = None
 ) -> str:
     """
     Membangun pesan HL7 ACK lengkap.
@@ -29,9 +31,11 @@ def build_ack(
         success                     : True → AA, False → AE.
         error_message               : Pesan error (opsional, untuk ERR segment).
         ack_code                    : Override kode ACK ('AA', 'AE', 'AR').
+        text_message                : Override teks MSA-3 (mis. catatan bahwa
+                                      pesan diantrekan untuk sinkronisasi ulang).
 
     Returns:
-        String pesan HL7 ACK siap kirim (dengan \r sebagai segment terminator).
+        String pesan HL7 ACK siap kirim (dengan CR sebagai segment terminator).
     """
     now     = datetime.now().strftime("%Y%m%d%H%M%S")
     ack_id  = f"ACK-{now}"
@@ -53,7 +57,10 @@ def build_ack(
 
     # ── MSA Segment ──────────────────────────────────────────────────────────
     # MSA|AckCode|OriginalMsgCtrlID|TextMessage
-    text_msg = "Processed successfully" if success else (error_message or "Processing error")
+    if text_message:
+        text_msg = text_message
+    else:
+        text_msg = "Processed successfully" if success else (error_message or "Processing error")
     msa = f"MSA|{ack_code}|{original_message_control_id}|{text_msg}"
 
     # ── ERR Segment (hanya jika ada error) ───────────────────────────────────
@@ -68,9 +75,14 @@ def build_ack(
     return ack_message
 
 
-def build_aa(msg_control_id: str) -> str:
-    """Shortcut: ACK dengan MSA|AA (Application Accept)."""
-    return build_ack(msg_control_id, success=True)
+def build_aa(msg_control_id: str, text: Optional[str] = None) -> str:
+    """
+    Shortcut: ACK dengan MSA|AA (Application Accept).
+
+    `text` mengisi MSA-3, mis. catatan bahwa pesan sudah diantrekan lokal
+    untuk sinkronisasi ulang saat SIMGOS kembali normal.
+    """
+    return build_ack(msg_control_id, success=True, text_message=text)
 
 
 def build_ae(msg_control_id: str, error: str = "") -> str:

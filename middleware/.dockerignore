@@ -1,0 +1,26 @@
+# ==============================================================================
+# .dockerignore - Middleware PACS-SIMGOS
+# ==============================================================================
+# Cegah data lokal ikut ter-pack ke dalam Docker image:
+#   - data/  : antrean spooler (spool.db) berisi payload hasil radiologi (PHI)
+#   - logs/  : log transaksi berisi nama pasien & NORM
+#   - .env   : kredensial SIMGOS API
+# ==============================================================================
+
+data/
+logs/
+*.db
+*.db-wal
+*.db-shm
+
+__pycache__/
+**/__pycache__/
+*.py[cod]
+
+.env
+*.env
+!.env.example
+
+.git/
+.gitignore
+README.md

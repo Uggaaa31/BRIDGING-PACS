@@ -12,6 +12,7 @@ ENV/
 # Logs
 *.log
 middleware/logs/
+middleware/data/
 simgos-api/logs/
 
 # Environment variables & secrets

@@ -34,10 +34,18 @@ BANNER = r"""
 
 
 def run_server_mode():
-    """Mode produksi: jalankan MLLP TCP server."""
+    """Mode produksi: jalankan MLLP TCP server + worker antrean lokal."""
+    from spooler.spool_worker import start_spool_worker, stop_spool_worker
     from listener.mllp_server import start_mllp_server
+
+    # Worker store-and-forward: menguras antrean lokal saat SIMGOS kembali normal.
+    start_spool_worker()
+
     log.info(f"Mode: MLLP Server | {MLLP_HOST}:{MLLP_PORT}")
-    start_mllp_server()
+    try:
+        start_mllp_server()
+    finally:
+        stop_spool_worker()
 
 
 def run_file_test_mode(filepath: str):

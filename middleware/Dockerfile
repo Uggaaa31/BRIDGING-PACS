@@ -22,8 +22,8 @@ RUN pip install --no-cache-dir -r requirements.txt
 # Copy source code middleware
 COPY . .
 
-# Buat direktori logs jika belum ada
-RUN mkdir -p /app/logs
+# Buat direktori logs + data (antrean spooler) jika belum ada
+RUN mkdir -p /app/logs /app/data
 
 # Expose port MLLP HL7
 EXPOSE 2575
